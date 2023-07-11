@@ -222,7 +222,6 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    //todo what does counts:
     int counts[world_size];
     index_calculation(counts, m * m, world_size);
     //for (int i = 0; i < world_size; ++i) {
