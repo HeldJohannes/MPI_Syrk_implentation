@@ -1,12 +1,18 @@
 # MPI_Syrk_implentation
 
+## Overview
+
+Implementation of the BLAS level 3 algorithm SYRK (Symmetric -k Rank update) using MPI.
+
 ## Usage
 
 ```
 make
-mpirun -np ... MPI_SYRK_implementation -m ... -n ... <input_file>
+mpirun -np <CORES> MPI_SYRK_implementation -m <ROWS> -n <COLS> <input_file>
 ```
 
+Testfiles and expected result files can be found in the folder **/test**.
+The first number is the number of rows and the second the number of columns. 
 ## Example
 
 input and expected result:
