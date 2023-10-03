@@ -26,3 +26,26 @@ input and expected result:
 1,3,5| 35, 44              1,2,3| 14, 32
 2,4,6| 44, 56              4,5,6| 32, 77
 ```
+
+## Getting Started
+
+1. Install OpenMPI
+
+   <details>
+        <summary>Under Mac OS</summary>
+   
+   - ### Using `brew`
+     - Install
+   
+          to install OpenMPI with brew  you can use the following command 
+          `brew install open-mpi`
+   - Commands
+     - mpicc
+     - mpirun
+      
+   </details>
+
+## Helpful Links
+
+- https://www.jetbrains.com/help/clion/openmpi.html
+- 
