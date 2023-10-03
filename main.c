@@ -92,21 +92,27 @@ int main(int argc, char *argv[]) {
         error_exit(rank, TRUE, argv[0], "To many or not enough input variables!");
     }
 
+    struct run_config {
+        int m;
+        int n;
+        char *fileName;
+    } config;
+
     //total_row_number
-    int m = -1;
+    config.m = -1;
 
     //total_col_number
-    int n = -1;
+    config.n = -1;
 
     int opt;
     char *end;
     while ((opt = getopt(argc, argv, "m:n:")) != -1) {
         switch (opt) {
             case 'm':
-                m = (int) strtol(optarg, &end, 10);
+                config.m = (int) strtol(optarg, &end, 10);
                 break;
             case 'n':
-                n = (int) strtol(optarg, &end, 10);
+                config.n = (int) strtol(optarg, &end, 10);
                 break;
             default:
             case '?':
@@ -114,33 +120,32 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    log_trace("m = %d; n = %d", m, n);
+    log_trace("m = %d; n = %d", config.m, config.n);
 
-    if (m == -1 || n == -1) {
-        error_exit(rank, TRUE, argv[0], "parameters m (= %d) and n (= %d) have to be bigger than 0", m, n);
+    if (config.m == -1 || config.n == -1) {
+        error_exit(rank, TRUE, argv[0], "parameters m (= %d) and n (= %d) have to be bigger than 0", config.m, config.n);
     }
 
     //input_matrix_in_array_form
-    int input[m * n];
+    int input[config.m * config.n];
 
     log_trace("optind = %d, argc = %d", optind, argc);
 
-    char *fileName = argv[optind];
+    config.fileName = argv[optind];
 
-    FILE *stream = fopen(fileName, "r");
+    FILE *stream = fopen(config.fileName, "r");
 
     if (stream == NULL) {
-        error_exit(rank, FALSE, argv[0], "[MPI process %d] Can't open the file: %s", rank, fileName);
+        error_exit(rank, FALSE, argv[0], "[MPI process %d] Can't open the file: %s", rank, config.fileName);
     }
 
-    char line[100];
+    char *line = NULL;
+    size_t len = 0;
     int counter = 0;
-    while (fgets(line, 100, stream)) {
-        char *subtoken, *tmp_line = line;
-        for (int i = 0; i < n; ++i) {
-            subtoken = strtok(tmp_line, ";");
+    while (getline(&line, &len, stream) != -1) {
+        char *subtoken = strtok(line, ";");
+        while (subtoken) {
             char *pEnd;
-            tmp_line = strchr(line, ';');
             long res = strtol(subtoken, &pEnd, 10);
             if (input[counter] > INT_MIN || input[counter] < INT_MAX) {
                 input[counter] = (int) res;
@@ -150,6 +155,7 @@ int main(int argc, char *argv[]) {
             }
             log_trace("[MPI process %d] input[%d] = %d", rank, counter, input[counter]);
             counter++;
+            subtoken = strtok(NULL, ";");
         }
     }
 
@@ -169,14 +175,14 @@ int main(int argc, char *argv[]) {
     log_trace("rank = %d, size = %d * m", rank, index_arr[rank]);
 
     // calculate how many cols each node gets
-    index_calculation(index_arr, n, world_size);
+    index_calculation(index_arr, config.n, world_size);
 //    display(rank, world_size, index_arr);
 
     //input matrix for each node:
-    int rank_input[index_arr[rank]][m];
+    int rank_input[index_arr[rank]][config.m];
 
     //transposed input matrix for each node:
-    int rank_input_t[m][index_arr[rank]];
+    int rank_input_t[config.m][index_arr[rank]];
 
     // compute the input matrix, and it's transpose,
     // which consists of the columns and all rows in that column:
@@ -190,8 +196,8 @@ int main(int argc, char *argv[]) {
         log_trace("rank = %d, rank_count = %d", rank, rank_count);
     }
     for (int col_count = 0; col_count < index_arr[rank]; ++col_count) {
-        for (int row_count = 0; row_count < m; ++row_count) {
-            int tmp = input[(col_count + rank_count) + row_count * n];
+        for (int row_count = 0; row_count < config.m; ++row_count) {
+            int tmp = input[(col_count + rank_count) + row_count * config.n];
             rank_input[col_count][row_count] = tmp;
             rank_input_t[row_count][col_count] = tmp;
             log_trace("rank-%d: rank_input[%d][%d] = %d", rank, col_count, row_count, rank_input[col_count][row_count]);
@@ -204,26 +210,26 @@ int main(int argc, char *argv[]) {
     // Compute the result matrix for each node which gets
     //  summed up by the MPI_Reduce_scatter() methode 
     //  and store the result in rank_result
-    int rank_result[m * m];
+    int rank_result[config.m * config.m];
     // set all array entries to 0:
-    for (int i = 0; i < m; ++i) {
-        for (int j = 0; j < m; ++j) {
-            rank_result[i * m + j] = 0;
+    for (int i = 0; i < config.m; ++i) {
+        for (int j = 0; j < config.m; ++j) {
+            rank_result[i * config.m + j] = 0;
         }
     }
-    for (int row = 0; row < m; ++row) {
-        for (int col = 0; col < m; ++col) {
+    for (int row = 0; row < config.m; ++row) {
+        for (int col = 0; col < config.m; ++col) {
             for (int c = 0; c < index_arr[rank]; ++c) {
                 log_trace("index_arr[%d] = %d", rank, index_arr[rank]);
-                rank_result[row * m + col] = rank_input[c][row] * rank_input_t[col][c] + rank_result[row * m + col];
-                log_trace("rank = %d; i = %d j = %d; result = %d", rank, row, col, rank_result[row * m + col]);
-                log_trace("rank = %d; i = %d j = %d; result = %d", rank, row, col, rank_result[row * m + col]);
+                rank_result[row * config.m + col] = rank_input[c][row] * rank_input_t[col][c] + rank_result[row * config.m + col];
+                log_trace("rank = %d; i = %d j = %d; result = %d", rank, row, col, rank_result[row * config.m + col]);
+                log_trace("rank = %d; i = %d j = %d; result = %d", rank, row, col, rank_result[row * config.m + col]);
             }
         }
     }
 
     int counts[world_size];
-    index_calculation(counts, m * m, world_size);
+    index_calculation(counts, config.m * config.m, world_size);
     //for (int i = 0; i < world_size; ++i) {
     //    counts[i] = index_arr[i];
     //}
@@ -247,8 +253,8 @@ int main(int argc, char *argv[]) {
     //display(rank, counts[rank], reduction_result);
 
     if (rank == 0) {
-        log_debug("m = %d", m);
-        int *buffer = (int *) calloc(m * m, sizeof(int));
+        log_debug("m = %d", config.m);
+        int *buffer = (int *) calloc(config.m * config.m, sizeof(int));
         int displacements[world_size];
         displacements[0] = 0;
         for (int i = 1; i < world_size; ++i) {
@@ -264,7 +270,7 @@ int main(int argc, char *argv[]) {
         //Print the result:
         printf("Values gathered in the buffer on process %d:\n", rank);
 
-        display(rank, m * m, buffer);
+        display(rank, config.m * config.m, buffer);
         free(buffer);
     } else {
         MPI_Gatherv(reduction_result, counts[rank], MPI_INT, NULL, NULL, NULL, MPI_INT, 0, MPI_COMM_WORLD);
