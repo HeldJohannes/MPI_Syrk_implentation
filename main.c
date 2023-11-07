@@ -1,13 +1,14 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <stdarg.h>
-#include <mpi.h>
-#include <limits.h>
-#include <time.h>
 #include "log.h"
 #include "MPI_Syrk_implementation.h"
+#include <limits.h>
+#include <mpi.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
+#include <cblas.h>
 
 #define TRUE 1
 #define FALSE 0
@@ -30,10 +31,11 @@ void index_calculation(int *arr, int n, int world_size);
 
 void readInputFile(int *input, int rank, char **argv);
 
-void computeInputAndTransposed(int rank, const int *index_arr, const int *input, int rank_input[][config.m], int rank_input_t[][index_arr[rank]]);
+void computeInputAndTransposed(int rank, const int *index_arr, const int *input, int rank_input[][config.m],
+                               int rank_input_t[][index_arr[rank]]);
 
-void syrkIterativ(int rank, const int *index_arr, const int rank_input[][config.m], const int rank_input_t[][index_arr[rank]], int rank_result[]);
-
+void syrkIterativ(int rank, const int *index_arr, const int rank_input[][config.m],
+                  const int rank_input_t[][index_arr[rank]], int rank_result[]);
 
 /**
  *
@@ -91,7 +93,21 @@ int main(int argc, char *argv[]) {
     //  summed up by the MPI_Reduce_scatter() methode 
     //  and store the result in rank_result
     int rank_result[config.m * config.m];
-    syrkIterativ(rank, index_arr, rank_input, rank_input_t, rank_result);
+    for (int i = 0; i < config.m * config.m; ++i) {
+        rank_result[i] = 0;
+    }
+    cblas_ssyrk(
+            CblasRowMajor,
+            CblasUpper,
+            CblasTrans,
+            config.m,
+            config.n,
+            1,
+            (const float *) input,
+            config.n,
+            1,
+            (float *) rank_result,
+            config.m);
 
     int counts[world_size];
     index_calculation(counts, config.m * config.m, world_size);
@@ -112,7 +128,7 @@ int main(int argc, char *argv[]) {
         int displacements[world_size];
         displacements[0] = 0;
         for (int i = 1; i < world_size; ++i) {
-            displacements[i] = displacements[i-1] + counts[i-1];
+            displacements[i] = displacements[i - 1] + counts[i - 1];
         }
 //        printf("counts:\n");
 //        printResult(rank, world_size, counts);
@@ -136,7 +152,8 @@ int main(int argc, char *argv[]) {
     return EXIT_SUCCESS;
 }
 
-void syrkIterativ(int rank, const int *index_arr, const int rank_input[][config.m], const int rank_input_t[][index_arr[rank]], int rank_result[]) {
+void syrkIterativ(int rank, const int *index_arr, const int rank_input[][config.m],
+                  const int rank_input_t[][index_arr[rank]], int rank_result[]) {
     // set all array entries to 0:
     for (int i = 0; i < config.m; ++i) {
         for (int j = 0; j < config.m; ++j) {
@@ -147,7 +164,8 @@ void syrkIterativ(int rank, const int *index_arr, const int rank_input[][config.
         for (int col = 0; col < config.m; ++col) {
             for (int c = 0; c < index_arr[rank]; ++c) {
                 log_trace("index_arr[%d] = %d", rank, index_arr[rank]);
-                rank_result[row * config.m + col] = rank_input[c][row] * rank_input_t[col][c] + rank_result[row * config.m + col];
+                rank_result[row * config.m + col] =
+                        rank_input[c][row] * rank_input_t[col][c] + rank_result[row * config.m + col];
                 log_trace("rank = %d; i = %d j = %d; result = %d", rank, row, col, rank_result[row * config.m + col]);
                 log_trace("rank = %d; i = %d j = %d; result = %d", rank, row, col, rank_result[row * config.m + col]);
             }
@@ -155,14 +173,13 @@ void syrkIterativ(int rank, const int *index_arr, const int rank_input[][config.
     }
 }
 
-void computeInputAndTransposed(int rank, const int *index_arr, const int *input, int rank_input[][config.m], int rank_input_t[][index_arr[rank]]){
-    int rank_count = rank;
+
+
+void computeInputAndTransposed(int rank, const int *index_arr, const int *input, int rank_input[][config.m],
+                               int rank_input_t[][index_arr[rank]]) {
+    int rank_count = 0;
     for (int i = 0; i < rank; ++i) {
-        if (i == 0) {
-            rank_count = index_arr[i];
-        } else {
-            rank_count += index_arr[i];
-        }
+        rank_count += index_arr[i];
         log_trace("rank = %d, rank_count = %d", rank, rank_count);
     }
     for (int col_count = 0; col_count < index_arr[rank]; ++col_count) {
@@ -230,17 +247,15 @@ void printResult(int rank, int len, int cols, int array[]) {
     //char *string = "[MPI process %d] ";
     //fprintf(file ,string , rank);
     for (int j = 0; j < cols; ++j) {
-        for (int i = j*cols; i < j * cols + cols; ++i) {
-            if (i == j * cols + cols -1) {
+        for (int i = j * cols; i < j * cols + cols; ++i) {
+            if (i == j * cols + cols - 1) {
                 fprintf(file, "%d", array[i]);
             } else {
                 fprintf(file, "%d; ", array[i]);
             }
-
         }
         fprintf(file, "\n");
     }
-
     printf("\n");
 }
 
@@ -269,7 +284,8 @@ void parseInput(int argc, char **argv, int rank) {
 
     log_trace("m = %d; n = %d", config.m, config.n);
     if (config.m == -1 || config.n == -1) {
-        error_exit(rank, TRUE, argv[0], "parameters m (= %d) and n (= %d) have to be bigger than 0", config.m, config.n);
+        error_exit(rank, TRUE, argv[0], "parameters m (= %d) and n (= %d) have to be bigger than 0", config.m,
+                   config.n);
     }
 
     log_trace("optind = %d, argc = %d", optind, argc);
