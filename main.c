@@ -1,5 +1,6 @@
 #include "log.h"
 #include "MPI_Syrk_implementation.h"
+#include <cblas.h>
 #include <limits.h>
 #include <mpi.h>
 #include <stdarg.h>
@@ -8,34 +9,11 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <cblas.h>
 
 #define TRUE 1
 #define FALSE 0
 
 
-/**
- * Usage function.
- * @brief This function writes helpful usage information about the program to stderr.
- * @param myprog the program name
- */
-void wrong_usage(char *myProgramName);
-
-void error_exit(int rank, int print_usage, char *name, const char *msg, ...);
-
-void parseInput(int argc, char **argv, int rank);
-
-void printResult(int rank, int len, int cols, int array[]);
-
-void index_calculation(int *arr, int n, int world_size);
-
-void readInputFile(int *input, int rank, char **argv);
-
-void computeInputAndTransposed(int rank, const int *index_arr, const int *input, int rank_input[][config.m],
-                               int rank_input_t[][index_arr[rank]]);
-
-void syrkIterativ(int rank, const int *index_arr, const int rank_input[][config.m],
-                  const int rank_input_t[][index_arr[rank]], int rank_result[]);
 
 /**
  *
@@ -72,6 +50,12 @@ int main(int argc, char *argv[]) {
 
     readInputFile(input, rank, argv);
 
+    printf("INPUT:\n");
+    for (int i = 0; i < config.m * config.n; ++i) {
+        printf("%d ", input[i]);
+    }
+    printf("\n");
+
     //check the size of col that each node gets
     log_trace("rank = %d, size = %d * m", rank, index_arr[rank]);
 
@@ -88,26 +72,36 @@ int main(int argc, char *argv[]) {
     // which consists of the columns and all rows in that column:
     computeInputAndTransposed(rank, index_arr, input, rank_input, rank_input_t);
 
+    printf("INPUT:\n");
+    for (int i = 0; i < index_arr[rank] * config.m; ++i) {
+        printf("%d ", *rank_input[i]);
+    }
+    printf("\n");
+    //printResult(rank, index_arr[rank], config.m, *rank_input);
+
     // SYRK:
     // Compute the result matrix for each node which gets
     //  summed up by the MPI_Reduce_scatter() methode 
     //  and store the result in rank_result
     int rank_result[config.m * config.m];
-    for (int i = 0; i < config.m * config.m; ++i) {
+    /*for (int i = 0; i < config.m * config.m; ++i) {
         rank_result[i] = 0;
-    }
+    }*/
     cblas_ssyrk(
             CblasRowMajor,
             CblasUpper,
-            CblasTrans,
+            CblasConjNoTrans,
             config.m,
             config.n,
             1,
             (const float *) input,
             config.n,
-            1,
+            0,
             (float *) rank_result,
             config.m);
+
+    printf("SYRK result:\n");
+    printResult(rank,  config.m, config.n, rank_result);
 
     int counts[world_size];
     index_calculation(counts, config.m * config.m, world_size);
@@ -140,8 +134,9 @@ int main(int argc, char *argv[]) {
         //Print the result:
         printf("Values gathered in the buffer on process %d:\n", rank);
 
-        printResult(rank, config.m * config.m, config.m, buffer);
+        printResult(rank, config.m, config.n, buffer);
         free(buffer);
+        printf("Values print finished...");
     } else {
         MPI_Gatherv(reduction_result, counts[rank], MPI_INT, NULL, NULL, NULL, MPI_INT, 0, MPI_COMM_WORLD);
     }
@@ -242,19 +237,23 @@ void index_calculation(int *arr, int n, int world_size) {
     }
 }
 
-void printResult(int rank, int len, int cols, int array[]) {
+void printResult(int rank, int rows, int cols, int array[]) {
+    printf("Print values on process %d:\n", rank);
     FILE *file = fopen("result.csv", "w");
     //char *string = "[MPI process %d] ";
     //fprintf(file ,string , rank);
-    for (int j = 0; j < cols; ++j) {
-        for (int i = j * cols; i < j * cols + cols; ++i) {
+    for (int j = 0; j < rows; ++j) {
+        for (int i = j * cols; i < (j+1) * cols; ++i) {
             if (i == j * cols + cols - 1) {
-                fprintf(file, "%d", array[i]);
+                //fprintf(file, "%d", array[i]);
+                fprintf(stdout, "%d ", array[i]);
             } else {
-                fprintf(file, "%d; ", array[i]);
+                //fprintf(file, "%d; ", array[i]);
+                fprintf(stdout, "%d ", array[i]);
             }
         }
-        fprintf(file, "\n");
+        //fprintf(file, "\n");
+        fprintf(stdout, "\n");
     }
     printf("\n");
 }

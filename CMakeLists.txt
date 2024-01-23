@@ -3,13 +3,7 @@
 #
 ########################################################################
 
-cmake_minimum_required(VERSION 3.12)
-
-if(${CMAKE_VERSION} VERSION_LESS 3.12)
-    cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
-endif()
-
-
+cmake_minimum_required(VERSION 3.26)
 
 project(MPI_SYRK_implementation
         VERSION 1.0
@@ -17,11 +11,17 @@ project(MPI_SYRK_implementation
 
 # Checks if MPI is available on this machine
 find_package(MPI REQUIRED)
+message("Found MPI LIBARIES: " ${MPI_FOUND})
+if (!MPI_FOUND)
+    message(FATAL_ERROR "MPI not found")
+endif (!MPI_FOUND)
 
-set(BLA_VENDOR OpenBLAS)
-set(CMAKE_PREFIX_PATH "/opt/homebrew/Cellar/openblas/0.3.24")
+
+#set(BLA_VENDOR OpenBLAS)
+#set(CMAKE_PREFIX_PATH "/opt/homebrew/Cellar/openblas/0.3.26")
 if (APPLE)
-    include_directories("/opt/homebrew/Cellar/openblas/0.3.24/include")
+    message(CMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}")
+    include_directories("${CMAKE_PREFIX_PATH}/include/")
 endif (APPLE)
 find_package(BLAS REQUIRED)
 
@@ -35,8 +35,10 @@ set(CMAKE_CXX_COMPILER mpicc)
 
 message("Found BLAS LIBARIES: " ${BLAS_FOUND})
 if (BLAS_FOUND)
-    message("Found OPEN_BLAS LIBARIES: " ${BLAS_LIBRARIES})
+    message("Found the BLAS LIBARIE: " ${BLAS_LIBRARIES})
 endif (BLAS_FOUND)
+
+include_directories("/opt/homebrew/include/")
 
 set(SOURCES main.c log.c MPI_Syrk_implementation.h)
 
