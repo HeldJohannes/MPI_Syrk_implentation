@@ -26,10 +26,10 @@ void printResult(int rank, int len, int cols, int array[]);
 
 void index_calculation(int *arr, int n, int world_size);
 
-void readInputFile(int *input, int rank, char **argv);
+void readInputFile(float *input, int rank, char **argv);
 
-void computeInputAndTransposed(int rank, const int *index_arr, const int *input, int rank_input[][config.m],
-                               int rank_input_t[][index_arr[rank]]);
+void computeInputAndTransposed(int rank, const int *index_arr, const float *input, float *rank_input,
+                               float *rank_input_t);
 
 void syrkIterativ(int rank, const int *index_arr, const int rank_input[][config.m],
                   const int rank_input_t[][index_arr[rank]], int rank_result[]);
