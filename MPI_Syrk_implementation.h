@@ -5,11 +5,12 @@
 #ifndef MPI_SYRK_IMPLEMENTATION_MPI_SYRK_IMPLEMENTATION_H
 #define MPI_SYRK_IMPLEMENTATION_MPI_SYRK_IMPLEMENTATION_H
 
-struct run_config {
+typedef struct {
     int m;
     int n;
+    int c;
     char *fileName;
-} config;
+} run_config;
 
 /**
  * Usage function.
