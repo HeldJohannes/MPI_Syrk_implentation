@@ -40,7 +40,7 @@ endif (BLAS_FOUND)
 
 include_directories("/opt/homebrew/include/")
 
-set(SOURCES main.c log.c MPI_Syrk_implementation.h)
+set(SOURCES src/main.c src/log.c src/MPI_Syrk_implementation.h)
 
 add_executable(MPI_SYRK_implementation ${SOURCES})
 
