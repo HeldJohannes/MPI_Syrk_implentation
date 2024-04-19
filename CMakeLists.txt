@@ -19,7 +19,8 @@ project(MPI_SYRK_implementation
 find_package(MPI REQUIRED)
 SET(CMAKE_C_COMPILER mpicc)
 
-add_executable(MPI_SYRK_implementation main.c log.c)
+add_executable(MPI_SYRK_implementation src/main.c src/log.c
+        src/MPI_Syrk_implementation.h)
 
 # Add libraries for code completion and compiling
 target_link_libraries(MPI_SYRK_implementation PUBLIC MPI::MPI_CXX)
