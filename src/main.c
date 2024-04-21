@@ -6,33 +6,12 @@
 #include <mpi.h>
 #include <limits.h>
 #include <time.h>
+#include <float.h>
 #include "log.h"
 #include "MPI_Syrk_implementation.h"
 
 #define TRUE 1
 #define FALSE 0
-
-
-/**
- * Usage function.
- * @brief This function writes helpful usage information about the program to stderr.
- * @param myprog the program name
- */
-void wrong_usage(char *myProgramName);
-
-void error_exit(int rank, int print_usage, char *name, const char *msg, ...);
-
-void parseInput(int argc, char **argv, int rank);
-
-void printResult(int rank, int len, int cols, int array[]);
-
-void index_calculation(int *arr, int n, int world_size);
-
-void readInputFile(int *input, int rank, char **argv);
-
-void computeInputAndTransposed(int rank, const int *index_arr, const int *input, int rank_input[][config.m], int rank_input_t[][index_arr[rank]]);
-
-void syrkIterativ(int rank, const int *index_arr, const int rank_input[][config.m], const int rank_input_t[][index_arr[rank]], int rank_result[]);
 
 
 /**
@@ -46,29 +25,26 @@ void syrkIterativ(int rank, const int *index_arr, const int rank_input[][config.
 int main(int argc, char *argv[]) {
 
     // setup:
-    log_set_level(LOG_INFO);
+    log_set_level(LOG_DEBUG);
+    static run_config config;
+    int world_size, rank;
 
     MPI_Init(&argc, &argv);
-
-    int world_size;
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-
-    int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     int index_arr[world_size];
-
-
     if (argc != 6) {
         error_exit(rank, TRUE, argv[0], "To many or not enough input variables!");
     }
 
-    parseInput(argc, argv, rank);
+    parseInput(&config, argc, argv, rank);
 
     //input_matrix_in_array_form
-    int input[config.m * config.n];
+    float input[config.m * config.n];
 
-    readInputFile(input, rank, argv);
+    //read the input matrix A:
+    read_input_file(rank, &config, input);
 
     //check the size of col that each node gets
     log_trace("rank = %d, size = %d * m", rank, index_arr[rank]);
@@ -77,21 +53,21 @@ int main(int argc, char *argv[]) {
     index_calculation(index_arr, config.n, world_size);
 
     //input matrix for each node:
-    int rank_input[index_arr[rank]][config.m];
+    float rank_input[index_arr[rank] * config.m];
 
     //transposed input matrix for each node:
-    int rank_input_t[config.m][index_arr[rank]];
+    float rank_input_t[config.m * index_arr[rank]];
 
     // compute the input matrix, and it's transpose,
     // which consists of the columns and all rows in that column:
-    computeInputAndTransposed(rank, index_arr, input, rank_input, rank_input_t);
+    computeInputAndTransposed(&config, rank, index_arr, input, rank_input, rank_input_t);
 
     // SYRK:
     // Compute the result matrix for each node which gets
     //  summed up by the MPI_Reduce_scatter() methode 
     //  and store the result in rank_result
-    int rank_result[config.m * config.m];
-    syrkIterativ(rank, index_arr, rank_input, rank_input_t, rank_result);
+    float rank_result[config.m * config.m];
+    syrkIterative(&config, rank, index_arr, rank_input, rank_input_t, rank_result);
 
     int counts[world_size];
     index_calculation(counts, config.m * config.m, world_size);
@@ -101,25 +77,25 @@ int main(int argc, char *argv[]) {
         reduction_result[i] = 0;
     }
 
-    int result = MPI_Reduce_scatter(rank_result, reduction_result, counts, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    int result = MPI_Reduce_scatter(rank_result, reduction_result, counts, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
     if (result != MPI_SUCCESS) {
         log_error("MPI_Reduce_scatter returned exit coed %d", result);
     }
 
     if (rank == 0) {
         log_debug("m = %d", config.m);
-        int *buffer = (int *) calloc(config.m * config.m, sizeof(int));
+        float *buffer = (float *) calloc(config.m * config.m, sizeof(float));
         int displacements[world_size];
         displacements[0] = 0;
         for (int i = 1; i < world_size; ++i) {
-            displacements[i] = displacements[i-1] + counts[i-1];
+            displacements[i] = displacements[i - 1] + counts[i - 1];
         }
 //        printf("counts:\n");
 //        printResult(rank, world_size, counts);
 //        printf("displacements:\n");
 //        printResult(rank, world_size, displacements);
 
-        MPI_Gatherv(reduction_result, counts[rank], MPI_INT, buffer, counts, displacements, MPI_INT, 0, MPI_COMM_WORLD);
+        MPI_Gatherv(reduction_result, counts[rank], MPI_FLOAT, buffer, counts, displacements, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
         //Print the result:
         printf("Values gathered in the buffer on process %d:\n", rank);
@@ -127,7 +103,7 @@ int main(int argc, char *argv[]) {
         printResult(rank, config.m * config.m, config.m, buffer);
         free(buffer);
     } else {
-        MPI_Gatherv(reduction_result, counts[rank], MPI_INT, NULL, NULL, NULL, MPI_INT, 0, MPI_COMM_WORLD);
+        MPI_Gatherv(reduction_result, counts[rank], MPI_FLOAT, NULL, NULL, NULL, MPI_FLOAT, 0, MPI_COMM_WORLD);
     }
 
 
@@ -136,52 +112,62 @@ int main(int argc, char *argv[]) {
     return EXIT_SUCCESS;
 }
 
-void syrkIterativ(int rank, const int *index_arr, const int rank_input[][config.m], const int rank_input_t[][index_arr[rank]], int rank_result[]) {
+void syrkIterative(run_config *s, int rank, const int *index_arr, const float rank_input[], const float rank_input_t[],
+                   float rank_result[]) {
     // set all array entries to 0:
-    for (int i = 0; i < config.m; ++i) {
-        for (int j = 0; j < config.m; ++j) {
-            rank_result[i * config.m + j] = 0;
+    log_debug("start syrkIterative:");
+    for (int i = 0; i < s->m; ++i) {
+        for (int j = 0; j < s->m; ++j) {
+            rank_result[i * s->m + j] = 0;
         }
     }
-    for (int row = 0; row < config.m; ++row) {
-        for (int col = 0; col < config.m; ++col) {
+    log_debug("after initial for loop");
+    for (int row = 0; row < s->m; ++row) {
+        //log_debug("outer for loop : row = %d; run_config.m = %d", row, s->m);
+        for (int col = 0; col < s->m; ++col) {
+            //log_debug("middle for loop : col = %d; run_config.n = %d", col, s->m);
             for (int c = 0; c < index_arr[rank]; ++c) {
-                log_trace("index_arr[%d] = %d", rank, index_arr[rank]);
-                rank_result[row * config.m + col] = rank_input[c][row] * rank_input_t[col][c] + rank_result[row * config.m + col];
-                log_trace("rank = %d; i = %d j = %d; result = %d", rank, row, col, rank_result[row * config.m + col]);
-                log_trace("rank = %d; i = %d j = %d; result = %d", rank, row, col, rank_result[row * config.m + col]);
+                log_debug("c = %d", c);
+                if (rank == 1) log_debug("rank_result[%d] = %f * %f + %f;", row * s->m + col, rank_input[c + row*index_arr[rank]],
+                          rank_input_t[c*s->m  + col], rank_result[row * s->m + col]);
+                rank_result[row * s->m + col] =
+                        rank_input[c + row*index_arr[rank]] * rank_input_t[c*s->m  + col] + rank_result[row * s->m + col];
+                log_trace("rank = %d; i = %d j = %d; result = %d", rank, row, col, rank_result[row * s->m + col]);
+                log_trace("rank = %d; i = %d j = %d; result = %d", rank, row, col, rank_result[row * s->m + col]);
             }
         }
     }
 }
 
-void computeInputAndTransposed(int rank, const int *index_arr, const int *input, int rank_input[][config.m], int rank_input_t[][index_arr[rank]]){
-    int rank_count = rank;
+void computeInputAndTransposed(run_config *s, int rank, const int *index_arr, const float *input, float *rank_input,
+                               float *rank_input_t) {
+    int rank_count = 0;
     for (int i = 0; i < rank; ++i) {
-        if (i == 0) {
-            rank_count = index_arr[i];
-        } else {
-            rank_count += index_arr[i];
-        }
-        log_trace("rank = %d, rank_count = %d", rank, rank_count);
+        rank_count += index_arr[i];
+        log_info("rank = %d, rank_count = %d", rank, rank_count);
     }
-    for (int col_count = 0; col_count < index_arr[rank]; ++col_count) {
-        for (int row_count = 0; row_count < config.m; ++row_count) {
-            int tmp = input[(col_count + rank_count) + row_count * config.n];
-            rank_input[col_count][row_count] = tmp;
-            rank_input_t[row_count][col_count] = tmp;
-            log_trace("rank-%d: rank_input[%d][%d] = %d", rank, col_count, row_count, rank_input[col_count][row_count]);
-            log_trace("rank-%d: rank_input_t[%d][%d] = %d", rank, row_count, col_count,
-                      rank_input_t[row_count][col_count]);
+    log_trace("index_arr[rank] = %d", index_arr[rank]);
+    int i = 0;
+    for (int row_count = 0; row_count < s->m; ++row_count) {
+        for (int col_count = 0; col_count < index_arr[rank]; ++col_count) {
+            float tmp = input[(col_count + rank_count) + row_count * s->n];
+            log_trace("tmp = %f", tmp);
+            log_trace("col_count = %d; row_count = %d", col_count, row_count);
+            rank_input[i] = tmp;
+            log_trace("rank_input[col_count + row_count = %d + %d (%d)] = %f", col_count, row_count,
+                      (col_count + rank_count) + row_count * s->n, rank_input[i]);
+            i++;
         }
     }
+    transposeMatrix(s->m, index_arr[rank], rank_input, rank_input_t);
 }
 
-void readInputFile(int *input, int rank, char **argv) {
-    FILE *stream = fopen(config.fileName, "r");
+int read_input_file(const int rank, run_config *s, float *A) {
+    FILE *stream = fopen(s->fileName, "r");
 
     if (stream == NULL) {
-        error_exit(rank, FALSE, argv[0], "[MPI process %d] Can't open the file: %s", rank, config.fileName);
+        printf("[MPI process %d] Failure in opening the file.\n", rank);
+        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
 
     char *line = NULL;
@@ -191,20 +177,21 @@ void readInputFile(int *input, int rank, char **argv) {
         char *subtoken = strtok(line, ";");
         while (subtoken) {
             char *pEnd;
-            long res = strtol(subtoken, &pEnd, 10);
-            if (input[counter] > INT_MIN || input[counter] < INT_MAX) {
-                input[counter] = (int) res;
+            float res = strtof(subtoken, &pEnd);
+            if (res > FLT_MIN || res < FLT_MAX) {
+                A[counter] = res;
             } else {
-                log_error("Input is not an integer --> Abort");
+                log_error("Input is not an float --> Abort");
                 MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
             }
-            log_trace("[MPI process %d] input[%d] = %d", rank, counter, input[counter]);
+            log_trace("[MPI process %d] input[%d] = %d", rank, counter, A[counter]);
             counter++;
             subtoken = strtok(NULL, ";");
         }
     }
 
     fclose(stream);
+    return EXIT_SUCCESS;
 }
 
 void wrong_usage(char *myProgramName) {
@@ -225,16 +212,17 @@ void index_calculation(int *arr, int n, int world_size) {
     }
 }
 
-void printResult(int rank, int len, int cols, int array[]) {
+void printResult(int rank, int len, int cols, float array[]) {
     FILE *file = fopen("result.csv", "w");
     //char *string = "[MPI process %d] ";
     //fprintf(file ,string , rank);
     for (int j = 0; j < cols; ++j) {
-        for (int i = j*cols; i < j * cols + cols; ++i) {
-            if (i == j * cols + cols -1) {
-                fprintf(file, "%d", array[i]);
+        for (int i = j * cols; i < j * cols + cols; ++i) {
+            log_debug("%f", array[i]);
+            if (i == j * cols + cols - 1) {
+                fprintf(file, "%f", array[i]);
             } else {
-                fprintf(file, "%d; ", array[i]);
+                fprintf(file, "%f; ", array[i]);
             }
 
         }
@@ -244,22 +232,22 @@ void printResult(int rank, int len, int cols, int array[]) {
     printf("\n");
 }
 
-void parseInput(int argc, char **argv, int rank) {
+void parseInput(run_config *s, int argc, char **argv, int rank) {
 
     //total_row_number
-    config.m = -1;
+    s->m = -1;
     //total_col_number
-    config.n = -1;
+    s->n = -1;
 
     int opt;
     char *end;
     while ((opt = getopt(argc, argv, "m:n:")) != -1) {
         switch (opt) {
             case 'm':
-                config.m = (int) strtol(optarg, &end, 10);
+                s->m = (int) strtol(optarg, &end, 10);
                 break;
             case 'n':
-                config.n = (int) strtol(optarg, &end, 10);
+                s->n = (int) strtol(optarg, &end, 10);
                 break;
             default:
             case '?':
@@ -267,13 +255,13 @@ void parseInput(int argc, char **argv, int rank) {
         }
     }
 
-    log_trace("m = %d; n = %d", config.m, config.n);
-    if (config.m == -1 || config.n == -1) {
-        error_exit(rank, TRUE, argv[0], "parameters m (= %d) and n (= %d) have to be bigger than 0", config.m, config.n);
+    log_trace("m = %d; n = %d", s->m, s->n);
+    if (s->m == -1 || s->n == -1) {
+        error_exit(rank, TRUE, argv[0], "parameters m (= %d) and n (= %d) have to be bigger than 0", s->m, s->n);
     }
 
     log_trace("optind = %d, argc = %d", optind, argc);
-    config.fileName = argv[optind];
+    s->fileName = argv[optind];
 }
 
 void error_exit(int rank, int print_usage, char *name, const char *msg, ...) {
@@ -295,4 +283,13 @@ void error_exit(int rank, int print_usage, char *name, const char *msg, ...) {
     }
     MPI_Finalize();
     exit(EXIT_FAILURE);
+}
+
+void transposeMatrix(int m, int n, float *matrix, float *result) {
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            result[j * m + i] = matrix[i * n + j];
+            log_trace("rank_input_t[%d] = %f", j * m + i, result[j * m + i]);
+        }
+    }
 }
