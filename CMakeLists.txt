@@ -3,7 +3,13 @@
 #
 ########################################################################
 
-cmake_minimum_required(VERSION 3.26)
+cmake_minimum_required(VERSION 3.9...3.29)
+
+if(${CMAKE_VERSION} VERSION_LESS 3.12)
+    cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
+endif()
+
+
 
 project(MPI_SYRK_implementation
         VERSION 1.0
@@ -16,17 +22,13 @@ if (!MPI_FOUND)
     message(FATAL_ERROR "MPI not found")
 endif (!MPI_FOUND)
 
-
-#set(BLA_VENDOR OpenBLAS)
-#set(CMAKE_PREFIX_PATH "/opt/homebrew/Cellar/openblas/0.3.26")
+set(BLA_VENDOR OpenBLAS)
 if (APPLE)
-    message(CMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}")
-    include_directories("${CMAKE_PREFIX_PATH}/include/")
+    set(CMAKE_PREFIX_PATH  "/opt/homebrew/Cellar/openblas/0.3.27/")
+    include_directories("/opt/homebrew/Cellar/openblas/0.3.27/include/")
 endif (APPLE)
 find_package(BLAS REQUIRED)
-
-find_path(BLAS_INCLUDE_DIRS cblas.h
-        $ENV{BLAS_HOME}/include)
+find_path(BLAS_INCLUDE_DIRS cblas.h $ENV{BLAS_HOME}/include)
 
 set(CMAKE_C_COMPILER mpicc)
 set(CMAKE_CXX_COMPILER mpicc)
