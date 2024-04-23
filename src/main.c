@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
 
     // setup:
     log_set_level(LOG_TRACE);
-    run_config* const config = malloc(sizeof(run_config));
+    run_config *const config = malloc(sizeof(run_config));
     config->arg_0 = argv[0];
 
     // MPI initialization:
@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
         printf("config.m = %d\n", config->m);
         for (int i = 0; i < index_arr[rank] * config->m; ++i) {
             printf("rank_input[i = %d] = %f ", i, rank_input[i]);
-            if (i % index_arr[rank] == 0 ) {
+            if (i % index_arr[rank] == 0) {
                 printf("\n");
             }
         }
@@ -104,7 +104,7 @@ int main(int argc, char *argv[]) {
         printf("\nSYRK result:\n");
         for (int i = 0; i < config->m; ++i) {
             for (int j = 0; j < config->m; ++j) {
-                printf("%f ", rank_result[i*config->m +j]);
+                printf("%f ", rank_result[i * config->m + j]);
             }
             printf("\n");
         }
@@ -133,14 +133,15 @@ int main(int argc, char *argv[]) {
         int displacements[world_size];
         displacements[0] = 0;
         for (int i = 1; i < world_size; ++i) {
-            displacements[i] = displacements[i-1] + counts[i];
+            displacements[i] = displacements[i - 1] + counts[i];
         }
 //        printf("counts:\n");
 //        printResult(rank, world_size, counts);
 //        printf("displacements:\n");
 //        printResult(rank, world_size, displacements);
 
-        MPI_Gatherv(reduction_result, counts[rank], MPI_FLOAT, buffer, counts, displacements, MPI_FLOAT, 0, MPI_COMM_WORLD);
+        MPI_Gatherv(reduction_result, counts[rank], MPI_FLOAT, buffer, counts, displacements, MPI_FLOAT, 0,
+                    MPI_COMM_WORLD);
 
         //Print the result:
         printf("Values gathered in the buffer on process %d:\n", rank);
@@ -149,7 +150,7 @@ int main(int argc, char *argv[]) {
         printf("Print values on process %d:\n", rank);
         for (int i = 0; i < config->m; ++i) {
             for (int j = 0; j < config->m; ++j) {
-                printf("%f ", buffer[i*config->m +j]);
+                printf("%f ", buffer[i * config->m + j]);
             }
             printf("\n");
         }
@@ -183,10 +184,13 @@ void syrkIterative(run_config *s, int rank, const int *index_arr, const float ra
             //log_debug("middle for loop : col = %d; run_config.n = %d", col, s->m);
             for (int c = 0; c < index_arr[rank]; ++c) {
                 log_debug("c = %d", c);
-                if (rank == 1) log_debug("rank_result[%d] = %f * %f + %f;", row * s->m + col, rank_input[c + row*index_arr[rank]],
-                          rank_input_t[c*s->m  + col], rank_result[row * s->m + col]);
+                if (rank == 1)
+                    log_debug("rank_result[%d] = %f * %f + %f;", row * s->m + col,
+                              rank_input[c + row * index_arr[rank]],
+                              rank_input_t[c * s->m + col], rank_result[row * s->m + col]);
                 rank_result[row * s->m + col] =
-                        rank_input[c + row*index_arr[rank]] * rank_input_t[c*s->m  + col] + rank_result[row * s->m + col];
+                        rank_input[c + row * index_arr[rank]] * rank_input_t[c * s->m + col] +
+                        rank_result[row * s->m + col];
                 log_trace("rank = %d; i = %d j = %d; result = %d", rank, row, col, rank_result[row * s->m + col]);
                 log_trace("rank = %d; i = %d j = %d; result = %d", rank, row, col, rank_result[row * s->m + col]);
             }
