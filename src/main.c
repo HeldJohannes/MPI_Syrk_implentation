@@ -9,10 +9,80 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <math.h>
 
 #define TRUE 1
 #define FALSE 0
 
+/**
+ * helper function f_k that we use in the specifications of both R_k and D_k
+ * @param k rank of the processor
+ * @param c prime such that P=c(c+1)
+ * @param u 0 ≤ u < c
+ * @return the row index of the block assigned to processor k in the u th zone of the first zone column.
+ */
+int f_k(int k, int c, int u) {
+    return ((k/c) * (u - 1) + k) % c + (c*u);
+}
+
+/**
+ *
+ * @param k
+ * @param c
+ * @param result
+ */
+void R_k(int k, int c, int *result) {
+    if (0 <= k && k < powl(c, 2)) {
+        result[0] = k/c;
+        for (int i = 1; i < c; ++i) {
+            result[i] = f_k(k, c, i);
+        }
+    } else {
+        for (int i = 0; i < c; ++i) {
+            result[i] = (k - (int) (pow(c, 2))) * c + i;
+        }
+    }
+}
+
+/**
+ *
+ * @param k
+ * @param c
+ * @param result
+ */
+void D_k(int k, int c, int *result) {
+    if (c <= k < pow(c, 2)) {
+        int res;
+        if (k % c == 0) {
+            res = k / c;
+        } else {
+            res = f_k(k, c , (int) k / c);
+        }
+        result[0] = res;
+    } else if (pow(c, 2) <= k < pow(c, 2) + c) {
+        result[0] = f_k((c * (k - (int) pow(c, 2))), c, k - (int) pow(c, 2));
+    }
+}
+
+int h_i(int i, int q, int c) {
+    return (i - (i/c - 1) * q) % c + c*q;
+}
+
+void Q_i(int i, int c, int *result) {
+    if (0 <= i && i < c) {
+        int q;
+        for (q = 0; q < c; ++q) {
+            result[q] = c * i + q;
+        }
+        result[q] = (int) pow(c, 2);
+    } else {
+        int q;
+        for (q = 0; q < c; ++q) {
+            result[q] = h_i(i, q, c);
+        }
+        result[q] = (int) pow(c, 2) + i/c;
+    }
+}
 
 /**
  *
@@ -74,7 +144,7 @@ int main(int argc, char *argv[]) {
     //  and store the result in rank_result
     float rank_result[config->m * config->m];
 
-    // todo: implement 2D alog here:
+    // todo: implement 2D algorithm here:
 
 
     int counts[world_size];
