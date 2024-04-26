@@ -84,21 +84,7 @@ int main(int argc, char *argv[]) {
     //  summed up by the MPI_Reduce_scatter() methode
     //  and store the result in rank_result
     float rank_result[config->m * config->m];
-    for (int i = 0; i < config->m * config->m; ++i) {
-        rank_result[i] = 0;
-    }
-    cblas_ssyrk(
-            CblasRowMajor,
-            CblasUpper,
-            CblasConjNoTrans,
-            config->m,
-            index_arr[rank],
-            1.0f,
-            rank_input,
-            index_arr[rank],
-            0.0f,
-            rank_result,
-            config->m);
+    syrk_1D(config, rank, index_arr, rank_input, rank_result);
 
     if (rank == 0) {
         printf("\nSYRK result:\n");
@@ -166,6 +152,24 @@ int main(int argc, char *argv[]) {
     MPI_Finalize();
     free(config);
     return EXIT_SUCCESS;
+}
+
+void syrk_1D(run_config *s, const int rank, const int *index_arr, const float *rank_input, float *rank_result) {
+    for (int i = 0; i < s->m * s->m; ++i) {
+        rank_result[i] = 0;
+    }
+    cblas_ssyrk(
+            CblasRowMajor,
+            CblasUpper,
+            CblasConjNoTrans,
+            s->m,
+            index_arr[rank],
+            1.0f,
+            rank_input,
+            index_arr[rank],
+            0.0f,
+            rank_result,
+            s->m);
 }
 
 void syrkIterative(run_config *s, int rank, const int *index_arr, const float rank_input[], const float rank_input_t[],
