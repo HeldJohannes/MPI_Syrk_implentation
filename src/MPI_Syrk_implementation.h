@@ -6,11 +6,12 @@
 #define MPI_SYRK_IMPLEMENTATION_MPI_SYRK_IMPLEMENTATION_H
 
 typedef struct {
-    int m;
-    int n;
-    int c;
+    int m; // number of rows
+    int n; // number of cols
+    int c; // prime number such that P=c(c+1)
     char *fileName;
     char *arg_0;
+    int P; //number of processors
 } run_config;
 
 /**
@@ -64,6 +65,6 @@ void computeInputAndTransposed(run_config *s, int rank, const int *index_arr, co
 
 void syrkIterative(run_config *s, int rank, const int *index_arr, const float* rank_input, const float* rank_input_t, float* rank_result);
 
-void transposeMatrix(int m, int n, float *matrix, float *result);
+extern void transposeMatrix(int m, int n, float *matrix, float *result);
 
 #endif //MPI_SYRK_IMPLEMENTATION_MPI_SYRK_IMPLEMENTATION_H

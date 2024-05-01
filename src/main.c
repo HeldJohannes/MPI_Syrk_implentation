@@ -64,6 +64,13 @@ void D_k(int k, int c, int *result) {
     }
 }
 
+/**
+ *
+ * @param i
+ * @param q
+ * @param c
+ * @return integer specifying the processor assigned block Ciq (which falls in the first zone column)
+ */
 int h_i(int i, int q, int c) {
     return (i - (i/c - 1) * q) % c + c*q;
 }
@@ -98,6 +105,8 @@ int main(int argc, char *argv[]) {
     log_set_level(LOG_TRACE);
     run_config *const config = malloc(sizeof(run_config));
     config->arg_0 = argv[0];
+    config->c = 2;
+    config->P = config->c * (config->c + 1) ;
 
     // MPI initialization:
     int world_size;
@@ -145,6 +154,28 @@ int main(int argc, char *argv[]) {
     float rank_result[config->m * config->m];
 
     // todo: implement 2D algorithm here:
+
+    // Gather c row blocks in row block set
+    int block_size = (config->m * config->n) / (int) (pow(config->c, 2) * (config->c + 1));
+    // Allocate array B of P blocks, each of size block_size
+    float B[config->P][block_size];
+    
+    int res_r_K[config->c];
+    R_k(rank, config->c, res_r_K);
+
+    for (int i = 0; i < config->c; ++i) {
+        int size = config->c + 1;
+        int res_Q_i[size];
+        Q_i(i, config->c, res_Q_i);
+        for (int k = 0; k < size; ++k) {
+            if (res_Q_i[k] != rank) {
+                // todo correct h´this code:
+                float tmp[block_size];
+                memcpy(B[k], tmp, sizeof(float) * block_size);
+            }
+        }
+
+    }
 
 
     int counts[world_size];

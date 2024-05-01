@@ -46,7 +46,6 @@ set(SOURCES src/main.c src/log.c src/MPI_Syrk_implementation.h)
 
 add_executable(MPI_SYRK_implementation ${SOURCES})
 
-
 # Add libraries for code completion and compiling
 target_link_libraries(MPI_SYRK_implementation PUBLIC MPI::MPI_CXX BLAS::BLAS)
 
