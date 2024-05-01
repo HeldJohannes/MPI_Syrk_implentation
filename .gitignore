@@ -50,4 +50,7 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
-/.idea/.gitignore
+
+# Ignored project specific folders
+/.idea/*
+/cmake-build-debug/*
