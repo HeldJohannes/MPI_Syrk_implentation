@@ -1,0 +1,1 @@
+mpiexec -np 6 ./cmake-build-debug/MPI_SYRK_implementation -m 60 -n 40 ./test/test60x40.csv
