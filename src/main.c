@@ -4,7 +4,6 @@
 #include <string.h>
 #include <stdarg.h>
 #include <mpi.h>
-#include <limits.h>
 #include <time.h>
 #include <float.h>
 #include "log.h"
@@ -34,8 +33,8 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     int index_arr[world_size];
-    if (argc != 6) {
-        error_exit(rank, TRUE, argv[0], "To many or not enough input variables!");
+    if (argc <= 6) {
+        error_exit(rank, argv[0], "To many or not enough input variables!");
     }
 
     parseInput(&config, argc, argv, rank);
@@ -105,7 +104,7 @@ int main(int argc, char *argv[]) {
         printf("Values gathered in the buffer on process %d:\n", rank);
         printf("The process took %f seconds to run.",  end - start);
 
-        printResult(rank, config.m * config.m, config.m, buffer);
+        printResult(rank, &config, config.m * config.m, config.m, buffer);
         free(buffer);
     } else {
         MPI_Gatherv(reduction_result, counts[rank], MPI_FLOAT, NULL, NULL, NULL, MPI_FLOAT, 0, MPI_COMM_WORLD);
@@ -199,10 +198,6 @@ int read_input_file(const int rank, run_config *s, float *A) {
     return EXIT_SUCCESS;
 }
 
-void wrong_usage(char *myProgramName) {
-    log_error("Usage: %s [-m row_count] [-n col_count] [file...]", myProgramName);
-}
-
 void index_calculation(int *arr, int n, int world_size) {
     int input_size = n / world_size;
 
@@ -217,8 +212,17 @@ void index_calculation(int *arr, int n, int world_size) {
     }
 }
 
-void printResult(int rank, int len, int cols, float array[]) {
-    FILE *file = fopen("result.csv", "w");
+void printResult(int rank, run_config *s, int len, int cols, float array[]) {
+    FILE *file;
+    if (s->result_File != NULL) {
+        log_debug("Printing result to set file = %s", s->result_File);
+        file = fopen(s->result_File, "w");
+    } else {
+        log_debug("Printing result to default file = result.csv");
+        file = fopen("result.csv", "w");
+    }
+
+
     //char *string = "[MPI process %d] ";
     //fprintf(file ,string , rank);
     for (int j = 0; j < cols; ++j) {
@@ -237,6 +241,15 @@ void printResult(int rank, int len, int cols, float array[]) {
     printf("\n");
 }
 
+/**
+ * Prints usage information for the program.
+ *
+ * @param prog_name Name of the program
+ */
+void print_usage(char *prog_name) {
+    fprintf(stderr, "Usage: \"mpiexec -np <CORES> %s -o <output_file> -m <ROWS> -n <COLS> <input_file> \"", prog_name);
+}
+
 void parseInput(run_config *s, int argc, char **argv, int rank) {
 
     //total_row_number
@@ -246,7 +259,7 @@ void parseInput(run_config *s, int argc, char **argv, int rank) {
 
     int opt;
     char *end;
-    while ((opt = getopt(argc, argv, "m:n:")) != -1) {
+    while ((opt = getopt(argc, argv, "m:n:o:")) != -1) {
         switch (opt) {
             case 'm':
                 s->m = (int) strtol(optarg, &end, 10);
@@ -254,22 +267,29 @@ void parseInput(run_config *s, int argc, char **argv, int rank) {
             case 'n':
                 s->n = (int) strtol(optarg, &end, 10);
                 break;
+            case 'o':
+                s->result_File = optarg;
+                break;
             default:
             case '?':
-                error_exit(rank, TRUE, argv[0], "wrong usage: option %c doesn't exist", opt);
+                print_usage(argv[0]);
+                if (optopt == '?') {
+                    exit(0);
+                }
+                error_exit(rank, argv[0], "wrong usage: option %c doesn't exist", opt);
         }
     }
 
     log_trace("m = %d; n = %d", s->m, s->n);
     if (s->m == -1 || s->n == -1) {
-        error_exit(rank, TRUE, argv[0], "parameters m (= %d) and n (= %d) have to be bigger than 0", s->m, s->n);
+        error_exit(rank, argv[0], "parameters m (= %d) and n (= %d) have to be bigger than 0", s->m, s->n);
     }
 
     log_trace("optind = %d, argc = %d", optind, argc);
     s->fileName = argv[optind];
 }
 
-void error_exit(int rank, int print_usage, char *name, const char *msg, ...) {
+void error_exit(int rank, char *name, const char *msg, ...) {
     if (rank == 0) {
 
         char buf[16];
@@ -282,15 +302,12 @@ void error_exit(int rank, int print_usage, char *name, const char *msg, ...) {
         vfprintf(stderr, msg, ap);
         va_end(ap);
         fprintf(stderr, "\n");
-        if (print_usage) {
-            wrong_usage(name);
-        }
     }
     MPI_Finalize();
     exit(EXIT_FAILURE);
 }
 
-void transposeMatrix(int m, int n, float *matrix, float *result) {
+void transposeMatrix(int m, int n, const float *matrix, float *result) {
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < n; j++) {
             result[j * m + i] = matrix[i * n + j];

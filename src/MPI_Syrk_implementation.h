@@ -10,6 +10,7 @@ typedef struct {
     int n;
     int c;
     char *fileName;
+    char *result_File;
 } run_config;
 
 /**
@@ -34,26 +35,18 @@ int read_input(run_config *s, int argc, char* argv[]);
 int read_input_file(const int rank, run_config *s, float *A);
 
 /**
- * Prints usage information for the program.
- *
- * @param myProgramName Name of the program
- */
-void wrong_usage(char *myProgramName);
-
-/**
  * This function is used to print error messages and exit the program.
  *
  * @param rank Rank of the caller
- * @param print_usage Flag indicating whether to print usage information
  * @param name Name of the program or function where the error occurred
  * @param msg Format string for the error message
  * @param ... Additional arguments for the error message (variable argument list)
  */
-void error_exit(int rank, int print_usage, char *name, const char *msg, ...);
+void error_exit(int rank, char *name, const char *msg, ...);
 
 void parseInput(run_config *s, int argc, char **argv, int rank);
 
-void printResult(int rank, int len, int cols, float array[]);
+void printResult(int rank, run_config *s, int len, int cols, float array[]);
 
 void index_calculation(int *arr, int n, int world_size);
 
@@ -63,6 +56,6 @@ void computeInputAndTransposed(run_config *s, int rank, const int *index_arr, co
 
 void syrkIterative(run_config *s, int rank, const int *index_arr, const float* rank_input, const float* rank_input_t, float* rank_result);
 
-void transposeMatrix(int m, int n, float *matrix, float *result);
+void transposeMatrix(int m, int n, const float *matrix, float *result);
 
 #endif //MPI_SYRK_IMPLEMENTATION_MPI_SYRK_IMPLEMENTATION_H
