@@ -25,7 +25,7 @@
 int main(int argc, char *argv[]) {
 
     // setup:
-    log_set_level(LOG_DEBUG);
+    log_set_level(LOG_INFO);
     static run_config config;
     int world_size, rank;
 
@@ -62,6 +62,8 @@ int main(int argc, char *argv[]) {
     // which consists of the columns and all rows in that column:
     computeInputAndTransposed(&config, rank, index_arr, input, rank_input, rank_input_t);
 
+    double start = MPI_Wtime();
+
     // SYRK:
     // Compute the result matrix for each node which gets
     //  summed up by the MPI_Reduce_scatter() methode 
@@ -97,8 +99,11 @@ int main(int argc, char *argv[]) {
 
         MPI_Gatherv(reduction_result, counts[rank], MPI_FLOAT, buffer, counts, displacements, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
+        double end = MPI_Wtime();
+
         //Print the result:
         printf("Values gathered in the buffer on process %d:\n", rank);
+        printf("The process took %f seconds to run.",  end - start);
 
         printResult(rank, config.m * config.m, config.m, buffer);
         free(buffer);
@@ -144,7 +149,7 @@ void computeInputAndTransposed(run_config *s, int rank, const int *index_arr, co
     int rank_count = 0;
     for (int i = 0; i < rank; ++i) {
         rank_count += index_arr[i];
-        log_info("rank = %d, rank_count = %d", rank, rank_count);
+        log_debug("rank = %d, rank_count = %d", rank, rank_count);
     }
     log_trace("index_arr[rank] = %d", index_arr[rank]);
     int i = 0;
