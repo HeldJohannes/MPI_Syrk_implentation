@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     int index_arr[world_size];
-    if (argc <= 6) {
+    if (argc <= 5) {
         error_exit(rank, argv[0], "To many or not enough input variables!");
     }
 
