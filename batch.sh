@@ -6,7 +6,7 @@ program_name="mpirun"
 executionFile="/Users/johannes/CLionProjects/MPI_Syrk_implentation/cmake-build-debug/MPI_SYRK_implementation"
 
 # Folder containing the files (replace with your actual folder path)
-folder_path="/Users/johannes/CLionProjects/MPI_Syrk_implentation/test/input"
+folder_path="/Users/johannes/CLionProjects/MPI_Syrk_implentation/test/in"
 
 # Output file for collected results (replace with your desired filename)
 output_file="results.csv"
@@ -36,16 +36,16 @@ echo "number of processors = $i"
 
       for (( j = 0; j < number_of_runs; j++ )); do
         # Build the command string
-        command="$program_name -np $x $executionFile -m $m -n $n $file"
+        command="$program_name -np $i $executionFile -m $m -n $n $file"
         echo "$command"
 
-        "$program_name" -np "$x" "$executionFile" -m "$m" -n "$n" "$file" > /tmp/script_output.txt
+        "$program_name" -np "$i" "$executionFile" -m "$m" -n "$n" "$file" > /tmp/script_output.txt
 
         # Execute the command and capture runtime
         run_time=$(grep -Eo '[0-9]+\.[0-9]+' <<< cat /tmp/script_output.txt)
 
         # Print data in CSV format (modify column order if needed)
-        echo "$x;$m;$n;$((j + 1));$run_time" >> "$output_file"
+        echo "$i;$m;$n;$((j + 1));$run_time" >> "$output_file"
       done
     fi
   done
