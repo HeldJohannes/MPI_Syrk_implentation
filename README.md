@@ -45,6 +45,14 @@ input and expected result:
       
    </details>
 
+## Generate Testdata
+
+You can use the R script in the test folder to generate testdata:
+
+```
+Rscript --vanilla ./test/GernateTestdata.R <dir_to_safe> <Number of Rows (m)> <Number of Cols (n)>
+```
+
 ## Helpful Links
 
 - https://www.jetbrains.com/help/clion/openmpi.html

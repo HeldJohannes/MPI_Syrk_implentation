@@ -46,16 +46,16 @@ void error_exit(int rank, char *name, const char *msg, ...);
 
 void parseInput(run_config *s, int argc, char **argv, int rank);
 
-void printResult(int rank, run_config *s, int len, int cols, float array[]);
+void printResult(run_config *s, int cols, float array[]);
 
 void index_calculation(int *arr, int n, int world_size);
 
 void readInputFile(int *input, int rank, char **argv);
 
-void computeInputAndTransposed(run_config *s, int rank, const int *index_arr, const float *input, float *rank_input, float *rank_input_t);
+void computeInputAndTransposed(run_config *s, int rank, const int *index_arr, float *input, const float **rank_input, float *rank_input_t);
 
-void syrkIterative(run_config *s, int rank, const int *index_arr, const float* rank_input, const float* rank_input_t, float* rank_result);
+void syrkIterative(run_config *s, int rank, const int *index_arr, const float** rank_input, float* rank_input_t, float* rank_result);
 
-void transposeMatrix(int m, int n, const float *matrix, float *result);
+void transposeMatrix(int m, int n, const float **matrix, float *result);
 
 #endif //MPI_SYRK_IMPLEMENTATION_MPI_SYRK_IMPLEMENTATION_H

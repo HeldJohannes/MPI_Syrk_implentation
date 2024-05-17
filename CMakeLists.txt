@@ -23,7 +23,7 @@ if (!MPI_FOUND)
 endif (!MPI_FOUND)
 
 set(BLA_VENDOR OpenBLAS)
-#set(CMAKE_PREFIX_PATH "/opt/homebrew/Cellar/openblas/0.3.26")
+#set(CMAKE_PREFIX_PATH "/opt/homebrew/Cellar/openblas/0.3.27")
 if (APPLE)
     set(OpenBLAS_DIR "/opt/homebrew/Cellar/openblas/")
 endif (APPLE)
@@ -49,5 +49,6 @@ add_executable(MPI_SYRK_implementation ${SOURCES})
 
 # Add libraries for code completion and compiling
 target_link_libraries(MPI_SYRK_implementation PUBLIC MPI::MPI_CXX BLAS::BLAS)
+target_compile_options(MPI_SYRK_implementation PRIVATE -Werror -Wall -Wextra)
 
 message(STATUS "Run: \" ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} ${MPIEXEC_MAX_NUMPROCS} ${MPIEXEC_PREFLAGS} MPI_SYRK_implementation ${MPIEXEC_POSTFLAGS} ARGS \" ")
