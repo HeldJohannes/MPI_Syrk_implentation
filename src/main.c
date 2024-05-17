@@ -120,8 +120,8 @@ int main(int argc, char *argv[]) {
 
         log_info("before printf");
         //Print the result:
-        printf("Values gathered in the buffer on process %d:", rank);
-        printf("The process took %f seconds to run.", (MPI_Wtime() - start));
+        printf("Values gathered in the buffer on process %d:\n", rank);
+        printf("The process took %f seconds to run.\n", (MPI_Wtime() - start));
 
         //printResult(&config, config.m, buffer);
 
