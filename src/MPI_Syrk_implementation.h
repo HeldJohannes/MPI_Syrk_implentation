@@ -52,10 +52,10 @@ void index_calculation(int *arr, int n, int world_size);
 
 void readInputFile(int *input, int rank, char **argv);
 
-void computeInputAndTransposed(run_config *s, int rank, const int *index_arr, float *input, const float **rank_input, float *rank_input_t);
+void computeInputAndTransposed(run_config *s, int rank, int *index_arr, float *input, float **rank_input, float *rank_input_t);
 
-void syrkIterative(run_config *s, int rank, const int *index_arr, const float** rank_input, float* rank_input_t, float* rank_result);
+void syrkIterative(run_config *s, int rank, int *index_arr, float** rank_input, float* rank_input_t, float* rank_result);
 
-void transposeMatrix(int m, int n, const float **matrix, float *result);
+void transposeMatrix(int m, int n, float **matrix, float *result);
 
 #endif //MPI_SYRK_IMPLEMENTATION_MPI_SYRK_IMPLEMENTATION_H

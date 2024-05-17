@@ -60,13 +60,12 @@ int main(int argc, char *argv[]) {
     index_calculation(index_arr, config.n, world_size);
 
     //input matrix for each node:
-    int size = config.m;
     log_info("index_arr[rank] => index_arr[%d] = %d", rank, index_arr[rank]);
-    log_info("size = %d", size);
-    const float **rank_input = (const float **) calloc(size, sizeof(float *));
+    log_info("size = %d", config.m);
+    float **rank_input = (float **) calloc(config.m, sizeof(float *));
 
     //transposed input matrix for each node:
-    float *rank_input_t = (float *) calloc(size, sizeof(float));
+    float *rank_input_t = (float *) calloc(config.m * index_arr[rank], sizeof(float));
 
     // compute the input matrix, and it's transpose,
     // which consists of the columns and all rows in that column:
@@ -157,15 +156,15 @@ int main(int argc, char *argv[]) {
     return EXIT_SUCCESS;
 }
 
-void syrkIterative(run_config *s, int rank, const int *index_arr, const float **rank_input, float rank_input_t[],
+void syrkIterative(run_config *s, int rank, int *index_arr, float **rank_input, float rank_input_t[],
                    float *rank_result) {
     // set all array entries to 0:
     log_debug("start syrkIterative:");
-    for (int i = 0; i < s->m; ++i) {
-        for (int j = 0; j < s->m; ++j) {
-            rank_result[i * s->m + j] = 0;
-        }
-    }
+//    for (int i = 0; i < s->m; ++i) {
+//        for (int j = 0; j < s->m; ++j) {
+//            rank_result[i * s->m + j] = 0;
+//        }
+//    }
     log_debug("after initial for loop");
     // for each result row:
     for (int row = 0; row < s->m; ++row) {
@@ -181,8 +180,7 @@ void syrkIterative(run_config *s, int rank, const int *index_arr, const float **
                               rank_input[c + row * index_arr[rank]],
                               rank_input_t[c * s->m + col], rank_result[row * s->m + col]);
 
-                rank_result[row * s->m + col] =
-                        *(rank_input[row] + c) * rank_input_t[c * s->m + col] + rank_result[row * s->m + col];
+                rank_result[row * s->m + col] = *(rank_input[row] + c) * rank_input_t[c * s->m + col] + rank_result[row * s->m + col];
 
                 log_trace("rank = %d; i = %d j = %d; result = %d", rank, row, col, rank_result[row * s->m + col]);
                 log_trace("rank = %d; i = %d j = %d; result = %d", rank, row, col, rank_result[row * s->m + col]);
@@ -191,7 +189,7 @@ void syrkIterative(run_config *s, int rank, const int *index_arr, const float **
     }
 }
 
-void computeInputAndTransposed(run_config *s, int rank, const int *index_arr, float *input, const float **rank_input,
+void computeInputAndTransposed(run_config *s, int rank, int *index_arr, float *input, float **rank_input,
                                float *rank_input_t) {
     int rank_count = 0;
     for (int i = 0; i < rank; ++i) {
@@ -361,7 +359,7 @@ void error_exit(int rank, char *name, const char *msg, ...) {
     exit(EXIT_FAILURE);
 }
 
-void transposeMatrix(int m, int n, const float **matrix, float *result) {
+void transposeMatrix(int m, int n, float **matrix, float *result) {
 
     for (int i = 0; i < m; i++) {
 
