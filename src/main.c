@@ -48,6 +48,10 @@ int main(int argc, char *argv[]) {
     log_info("Size = %d (SIZE_MAX = %zu) => %zu", config.m * config.n, SIZE_MAX, config.m * config.n * sizeof(float));
     //input_matrix_in_array_form
     float *input = (float *) calloc(config.m * config.n, sizeof(float));
+    if (!input) {
+        log_error("Memory allocation failed for input");
+        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    }
 
 
     //read the input matrix A:
@@ -63,9 +67,24 @@ int main(int argc, char *argv[]) {
     log_info("index_arr[rank] => index_arr[%d] = %d", rank, index_arr[rank]);
     log_info("size = %d", config.m);
     float **rank_input = (float **) calloc(config.m, sizeof(float *));
+    for (int i = 0; i < config.m; ++i) {
+        if (rank_input[i] == NULL) {
+            log_error("Memory allocation failed for input");
+            MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+        }
+        rank_input[i] = (float *) calloc(index_arr[rank], sizeof(float));
+        if (!rank_input[i]) {
+            log_error("Memory allocation failed for rank_input[%d]", i);
+            MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+        }
+    }
 
     //transposed input matrix for each node:
     float *rank_input_t = (float *) calloc(config.m * index_arr[rank], sizeof(float));
+    if (!rank_input_t) {
+        log_error("Memory allocation failed for input");
+        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    }
 
     // compute the input matrix, and it's transpose,
     // which consists of the columns and all rows in that column:
@@ -79,6 +98,10 @@ int main(int argc, char *argv[]) {
     //  summed up by the MPI_Reduce_scatter() methode 
     //  and store the result in rank_result
     float *rank_result = (float *) calloc(config.m * config.m, sizeof(float));
+    if (!rank_result) {
+        log_error("Memory allocation failed for input with errno");
+        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    }
     syrkIterative(&config, rank, index_arr, rank_input, rank_input_t, rank_result);
     log_info("syrk Successful");
 
@@ -100,7 +123,15 @@ int main(int argc, char *argv[]) {
     if (rank == 0) {
         log_debug("m = %d", config.m);
         float *buffer = (float *) calloc(config.m * config.m, sizeof(float));
+        if (!buffer) {
+            log_error("Memory allocation failed for input with errno");
+            MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+        }
         int *displacements = (int *) calloc(world_size, sizeof(int));
+        if (!displacements) {
+            log_error("Memory allocation failed for input with errno");
+            MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+        }
         displacements[0] = 0;
         for (int i = 1; i < world_size; ++i) {
             displacements[i] = displacements[i - 1] + counts[i - 1];
@@ -111,7 +142,7 @@ int main(int argc, char *argv[]) {
 //        printResult(rank, world_size, displacements);
 
         int status = MPI_Gatherv(reduction_result, counts[rank], MPI_FLOAT, buffer, counts, displacements, MPI_FLOAT, 0,
-                    MPI_COMM_WORLD);
+                                 MPI_COMM_WORLD);
 
         if (status != MPI_SUCCESS) {
             log_error("MPI_Gatherv returned %d", status);
@@ -133,7 +164,8 @@ int main(int argc, char *argv[]) {
         log_info("[if rank == 0]: Successfully freed -> displacements...");
     } else {
         int status;
-        if ((status = MPI_Gatherv(reduction_result, counts[rank], MPI_FLOAT, NULL, NULL, NULL, MPI_FLOAT, 0, MPI_COMM_WORLD)) != MPI_SUCCESS) {
+        if ((status = MPI_Gatherv(reduction_result, counts[rank], MPI_FLOAT, NULL, NULL, NULL, MPI_FLOAT, 0,
+                                  MPI_COMM_WORLD)) != MPI_SUCCESS) {
             log_error("MPI_Gatherv returned %d", status);
         }
     }
@@ -184,7 +216,8 @@ void syrkIterative(run_config *s, int rank, int *index_arr, float **rank_input, 
                               rank_input[c + row * index_arr[rank]],
                               rank_input_t[c * s->m + col], rank_result[row * s->m + col]);
 
-                rank_result[row * s->m + col] = *(rank_input[row] + c) * rank_input_t[c * s->m + col] + rank_result[row * s->m + col];
+                rank_result[row * s->m + col] =
+                        *(rank_input[row] + c) * rank_input_t[c * s->m + col] + rank_result[row * s->m + col];
 
                 log_trace("rank = %d; i = %d j = %d; result = %d", rank, row, col, rank_result[row * s->m + col]);
                 log_trace("rank = %d; i = %d j = %d; result = %d", rank, row, col, rank_result[row * s->m + col]);
