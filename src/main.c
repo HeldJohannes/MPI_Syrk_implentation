@@ -84,8 +84,9 @@ int main(int argc, char *argv[]) {
 
     int counts[world_size];
     index_calculation(counts, config.m * config.m, world_size);
+    log_info("index_calculation Successful");
 
-    int reduction_result[counts[rank]];
+    int *reduction_result = (int *) calloc(counts[rank], sizeof(int));
     for (int n = 0; n < counts[rank]; ++n) {
         reduction_result[n] = 0;
     }
@@ -94,6 +95,7 @@ int main(int argc, char *argv[]) {
     if (result != MPI_SUCCESS) {
         log_error("MPI_Reduce_scatter returned exit coed %d", result);
     }
+    log_info("MPI_Reduce_scatter Successful");
 
     if (rank == 0) {
         log_debug("m = %d", config.m);
@@ -116,14 +118,13 @@ int main(int argc, char *argv[]) {
         }
 
 
-        //double runtime = MPI_Wtime();
+        double runtime = MPI_Wtime() - start;
 
-        log_info("before printf");
         //Print the result:
         printf("Values gathered in the buffer on process %d:\n", rank);
-        printf("The process took %f seconds to run.\n", (MPI_Wtime() - start));
+        printf("The process took %f seconds to run.\n", (runtime));
 
-        //printResult(&config, config.m, buffer);
+        printResult(&config, config.m, buffer);
 
 
         free(buffer);
@@ -137,6 +138,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    free(reduction_result);
+    log_info("Successfully freed the buffer -> reduction_result");
     free(input);
     log_info("Successfully freed the buffer -> input");
     free(rank_input);
@@ -168,6 +171,7 @@ void syrkIterative(run_config *s, int rank, int *index_arr, float **rank_input, 
     log_debug("after initial for loop");
     // for each result row:
     for (int row = 0; row < s->m; ++row) {
+        //log_info("row (%d)", row);
         //log_debug("outer for loop : row = %d; run_config.m = %d", row, s->m);
         // for each result column
         for (int col = 0; col < s->m; ++col) {
@@ -201,7 +205,7 @@ void computeInputAndTransposed(run_config *s, int rank, int *index_arr, float *i
     for (int row_count = 0; row_count < s->m; row_count++) {
         //for (int col_count = 0; col_count < index_arr[rank]; ++col_count) {
         //float tmp = input[(col_count + rank_count) + row_count * s->n];
-        log_info("read index = %d", (rank_count) + row_count * s->n);
+        //log_info("read index = %d", (rank_count) + row_count * s->n);
         //log_trace("tmp = %f", tmp);
         //log_trace("col_count = %d; row_count = %d", col_count, row_count);
         float *tmp = &input[(rank_count) + row_count * s->n];
@@ -269,7 +273,7 @@ void printResult(run_config *s, int cols, float *array) {
         file = fopen(s->result_File, "w");
     } else {
         log_info("Printing result to default file = result.csv");
-        file = fopen("result.csv", "w");
+        file = fopen("syrk_result.csv", "w");
     }
 
 
