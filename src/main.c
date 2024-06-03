@@ -68,10 +68,6 @@ int main(int argc, char *argv[]) {
     log_info("size = %d", config.m);
     float **rank_input = (float **) calloc(config.m, sizeof(float *));
     for (int i = 0; i < config.m; ++i) {
-        if (rank_input[i] == NULL) {
-            log_error("Memory allocation failed for input");
-            MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-        }
         rank_input[i] = (float *) calloc(index_arr[rank], sizeof(float));
         if (!rank_input[i]) {
             log_error("Memory allocation failed for rank_input[%d]", i);
@@ -200,9 +196,10 @@ void syrkIterative(run_config *s, int rank, int *index_arr, float **rank_input, 
 //            rank_result[i * s->m + j] = 0;
 //        }
 //    }
-    log_debug("after initial for loop");
+    log_error("index_arr[rank = %d] == %d", rank, index_arr[rank]);
     // for each result row:
     for (int row = 0; row < s->m; ++row) {
+        if (rank == 2) log_error("row == %d", row);
         //log_info("row (%d)", row);
         //log_debug("outer for loop : row = %d; run_config.m = %d", row, s->m);
         // for each result column
