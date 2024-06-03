@@ -223,6 +223,31 @@ void syrkIterative(run_config *s, int rank, int *index_arr, float **rank_input, 
     }
 }
 
+void improved_syrkIterative(run_config *s, int rank, const int *index_arr, const float rank_input[], const float rank_input_t[],
+                            float rank_result[]) {
+    // set all array entries to 0:
+    for (int i = 0; i < s->m; ++i) {
+        for (int j = 0; j < s->m; ++j) {
+            rank_result[i * s->m + j] = 0;
+        }
+    }
+    for (int row = 0; row < s->m; ++row) {
+        //log_debug("outer for loop : row = %d; run_config.m = %d", row, s->m);
+        for (int col = row; col < s->m; ++col) {
+            //log_debug("middle for loop : col = %d; run_config.n = %d", col, s->m);
+            for (int c = 0; c < index_arr[rank]; ++c) {
+                log_debug("c = %d", c);
+                if (rank == 1) log_debug("rank_result[%d] = %f * %f + %f;", row * s->m + col, rank_input[c + row*index_arr[rank]],
+                                         rank_input_t[c*s->m  + col], rank_result[row * s->m + col]);
+                rank_result[row * s->m + col] =
+                        rank_input[c + row*index_arr[rank]] * rank_input_t[c*s->m  + col] + rank_result[row * s->m + col];
+                log_trace("rank = %d; i = %d j = %d; result = %d", rank, row, col, rank_result[row * s->m + col]);
+                log_trace("rank = %d; i = %d j = %d; result = %d", rank, row, col, rank_result[row * s->m + col]);
+            }
+        }
+    }
+}
+
 void computeInputAndTransposed(run_config *s, int rank, int *index_arr, float *input, float **rank_input,
                                float *rank_input_t) {
     int rank_count = 0;
