@@ -7,6 +7,7 @@
 #include <time.h>
 #include <float.h>
 #include "log.h"
+#include <cblas.h>
 #include "MPI_Syrk_implementation.h"
 
 #define TRUE 1
@@ -246,6 +247,21 @@ void improved_syrkIterative(run_config *s, int rank, const int *index_arr, const
             }
         }
     }
+}
+
+void syrk_withOpenBLAS(run_config *config, int rank, int *index_arr, float *rank_input, float *rank_result) {
+    cblas_ssyrk(
+            CblasRowMajor,
+            CblasUpper,
+            CblasConjNoTrans,
+            config->m,
+            index_arr[rank],
+            1.0f,
+            rank_input,
+            index_arr[rank],
+            0.0f,
+            rank_result,
+            config->m);
 }
 
 void computeInputAndTransposed(run_config *s, int rank, int *index_arr, float *input, float **rank_input,

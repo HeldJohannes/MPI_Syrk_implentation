@@ -17,30 +17,27 @@ project(MPI_SYRK_implementation
 
 # Checks if MPI is available on this machine
 find_package(MPI REQUIRED)
-message("Found MPI LIBARIES: " ${MPI_FOUND})
+message("Found MPI LIBARIES: " ${MPI_FOUND} " -> " ${MPI_C_LIBRARIES})
+message("Added MPI header dir: " ${MPI_C_INCLUDE_DIRS})
 if (!MPI_FOUND)
     message(FATAL_ERROR "MPI not found")
 endif (!MPI_FOUND)
 
+#link openBlas
 set(BLA_VENDOR OpenBLAS)
-#set(CMAKE_PREFIX_PATH "/opt/homebrew/Cellar/openblas/0.3.27")
-if (APPLE)
-    set(OpenBLAS_DIR "/opt/homebrew/Cellar/openblas/")
-endif (APPLE)
+set(BLA_INCLUDE_DIRS /opt/homebrew/Cellar/openblas/0.3.27/include)
 find_package(BLAS REQUIRED GLOBAL)
-find_path(BLAS_INCLUDE_DIRS cblas.h $ENV{BLAS_HOME}/include)
+message("Found BLAS LIBARIES: " ${BLAS_FOUND} " -> " ${BLAS_LIBRARIES})
+include_directories(${BLA_INCLUDE_DIRS})
+message("Added BLAS header dir: " ${BLA_INCLUDE_DIRS})
+message("")
 
 set(CMAKE_C_COMPILER mpicc)
 set(CMAKE_CXX_COMPILER mpicc)
 
-#link openBlas
 
-message("Found BLAS LIBARIES: " ${BLAS_FOUND})
-if (BLAS_FOUND)
-    message("Found the BLAS LIBARIE: " ${BLAS_LIBRARIES})
-endif (BLAS_FOUND)
 
-include_directories("/opt/homebrew/include/")
+
 
 set(SOURCES src/main.c src/log.c src/MPI_Syrk_implementation.h)
 
