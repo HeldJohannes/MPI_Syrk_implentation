@@ -10,8 +10,7 @@
 #include <cblas.h>
 #include "MPI_Syrk_implementation.h"
 
-#define TRUE 1
-#define FALSE 0
+#define ALGO 0
 
 
 /**
@@ -99,7 +98,21 @@ int main(int argc, char *argv[]) {
         log_error("Memory allocation failed for input with errno");
         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
-    syrkIterative(&config, rank, index_arr, rank_input, rank_input_t, rank_result);
+
+    switch (ALGO) {
+        case 0:
+            syrkIterative(&config, rank, index_arr, rank_input, rank_input_t, rank_result);
+            break;
+        case 1:
+            improved_syrkIterative(&config, rank, index_arr, *rank_input, rank_input_t, rank_result);
+            break;
+        case 2:
+            syrk_withOpenBLAS(&config, rank, index_arr, *rank_input, rank_result);
+        default:
+            log_fatal("no SYRK operator selected --> error");
+            error_exit(rank, argv[0], "no SYRK operator selected");
+    }
+
     log_info("syrk Successful");
 
     int counts[world_size];
