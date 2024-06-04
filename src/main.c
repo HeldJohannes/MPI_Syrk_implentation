@@ -3,14 +3,16 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdarg.h>
+#include <assert.h>
+#include <limits.h>
 #include <mpi.h>
 #include <time.h>
 #include <float.h>
 #include "log.h"
-#include <cblas.h>
+#include <openblas/cblas.h>
 #include "MPI_Syrk_implementation.h"
 
-#define ALGO 0
+int ALGO = 0;
 
 
 /**
@@ -49,7 +51,7 @@ int main(int argc, char *argv[]) {
     //input_matrix_in_array_form
     float *input = (float *) calloc(config.m * config.n, sizeof(float));
     if (!input) {
-        log_error("Memory allocation failed for input");
+        log_fatal("Memory allocation failed for input");
         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
 
@@ -70,7 +72,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < config.m; ++i) {
         rank_input[i] = (float *) calloc(index_arr[rank], sizeof(float));
         if (!rank_input[i]) {
-            log_error("Memory allocation failed for rank_input[%d]", i);
+            log_fatal("Memory allocation failed for rank_input[%d]", i);
             MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
         }
     }
@@ -78,14 +80,13 @@ int main(int argc, char *argv[]) {
     //transposed input matrix for each node:
     float *rank_input_t = (float *) calloc(config.m * index_arr[rank], sizeof(float));
     if (!rank_input_t) {
-        log_error("Memory allocation failed for input");
+        log_fatal("Memory allocation failed for input");
         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
 
     // compute the input matrix, and it's transpose,
     // which consists of the columns and all rows in that column:
     computeInputAndTransposed(&config, rank, index_arr, input, rank_input, rank_input_t);
-    log_info("computeInputAndTransposed Successful");
 
     double start = MPI_Wtime();
 
@@ -93,9 +94,12 @@ int main(int argc, char *argv[]) {
     // Compute the result matrix for each node which gets
     //  summed up by the MPI_Reduce_scatter() methode 
     //  and store the result in rank_result
-    float *rank_result = (float *) calloc(config.m * config.m, sizeof(float));
+    log_trace(" config.m * config.m < INT_MAX == %d", config.m * config.m < INT_MAX);
+    long test = config.m * config.m;
+    log_trace("Test config.m = %d; config.m * config.m = %lld",config.m, test);
+    float *rank_result = (float *) calloc(test, sizeof(float));
     if (!rank_result) {
-        log_error("Memory allocation failed for input with errno");
+        log_fatal("[processor %d] Memory allocation failed for input with errno", rank);
         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
 
@@ -108,11 +112,11 @@ int main(int argc, char *argv[]) {
             break;
         case 2:
             syrk_withOpenBLAS(&config, rank, index_arr, *rank_input, rank_result);
+            break;
         default:
-            log_fatal("no SYRK operator selected --> error");
+            log_fatal("no SYRK operator selected --> error ALOG %d not in [0..2]", ALGO);
             error_exit(rank, argv[0], "no SYRK operator selected");
     }
-
     log_info("syrk Successful");
 
     int counts[world_size];
@@ -205,11 +209,11 @@ void syrkIterative(run_config *s, int rank, int *index_arr, float **rank_input, 
                    float *rank_result) {
     // set all array entries to 0:
     log_debug("start syrkIterative:");
-//    for (int i = 0; i < s->m; ++i) {
-//        for (int j = 0; j < s->m; ++j) {
-//            rank_result[i * s->m + j] = 0;
-//        }
-//    }
+    for (int i = 0; i < s->m; ++i) {
+        for (int j = 0; j < s->m; ++j) {
+            rank_result[i * s->m + j] = 0;
+        }
+    }
     log_error("index_arr[rank = %d] == %d", rank, index_arr[rank]);
     // for each result row:
     for (int row = 0; row < s->m; ++row) {
@@ -240,11 +244,14 @@ void syrkIterative(run_config *s, int rank, int *index_arr, float **rank_input, 
 void improved_syrkIterative(run_config *s, int rank, const int *index_arr, const float rank_input[], const float rank_input_t[],
                             float rank_result[]) {
     // set all array entries to 0:
-    for (int i = 0; i < s->m; ++i) {
-        for (int j = 0; j < s->m; ++j) {
-            rank_result[i * s->m + j] = 0;
-        }
-    }
+//    log_fatal("Test %p", &rank_result);
+//    for (int i = 0; i < s->m; ++i) {
+//        for (int j = 0; j < s->m; ++j) {
+//            assert(&rank_result[(s->m - 1) * s->m + (s->m -1)] != NULL);
+//            rank_result[i * s->m + j] = 0;
+//        }
+//    }
+//    log_fatal("Test set all array entries to 0");
     for (int row = 0; row < s->m; ++row) {
         //log_debug("outer for loop : row = %d; run_config.m = %d", row, s->m);
         for (int col = row; col < s->m; ++col) {
@@ -305,6 +312,21 @@ void computeInputAndTransposed(run_config *s, int rank, int *index_arr, float *i
 }
 
 int read_input_file(const int rank, run_config *s, float *A) {
+//    MPI_File mpiFile;
+//    if (MPI_File_open(MPI_COMM_WORLD, s->fileName, MPI_MODE_RDONLY, MPI_INFO_NULL, &mpiFile)) {
+//        printf("[MPI process %d] Failure in opening the file.\n", rank);
+//        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+//    }
+//
+//    MPI_Offset filesize;
+//    MPI_File_get_size(mpiFile, &filesize);
+//    printf("[MPI process %d] File size == %lld\n", rank, filesize);
+//
+//    MPI_File_read(mpiFile, )
+//
+//
+//    MPI_File_close(&mpiFile);
+
     FILE *stream = fopen(s->fileName, "r");
 
     if (stream == NULL) {
@@ -315,7 +337,10 @@ int read_input_file(const int rank, run_config *s, float *A) {
     char *line = NULL;
     size_t len = 0;
     int counter = 0;
-    while (getline(&line, &len, stream) != -1) {
+    while (1) {
+        ssize_t n = getline(&line, &len, stream);
+        log_error("ssize_t n = %d", n);
+        if (n == -1) break;
         char *subtoken = strtok(line, ";");
         while (subtoken) {
             char *pEnd;
@@ -326,7 +351,7 @@ int read_input_file(const int rank, run_config *s, float *A) {
                 log_error("Input is not an float --> Abort");
                 MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
             }
-            log_trace("[MPI process %d] input[%d] = %d", rank, counter, A[counter]);
+            //log_trace("[MPI process %d] input[%d] = %d", rank, counter, A[counter]);
             counter++;
             subtoken = strtok(NULL, ";");
         }
@@ -398,8 +423,11 @@ void parseInput(run_config *s, int argc, char **argv, int rank) {
 
     int opt;
     char *end;
-    while ((opt = getopt(argc, argv, "m:n:o:")) != -1) {
+    while ((opt = getopt(argc, argv, "a:m:n:o:")) != -1) {
         switch (opt) {
+            case 'a':
+                ALGO = (int) strtol(optarg, &end, 10);
+                break;
             case 'm':
                 s->m = (int) strtol(optarg, &end, 10);
                 break;
