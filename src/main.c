@@ -416,11 +416,9 @@ void parseInput(run_config *s, int argc, char **argv, int rank) {
                 break;
             case 'm':
                 s->m = (int) strtol(optarg, &end, 10);
-                M = s->m;
                 break;
             case 'n':
                 s->n = (int) strtol(optarg, &end, 10);
-                N = s->n;
                 break;
             case 'o':
                 s->result_File = optarg;
