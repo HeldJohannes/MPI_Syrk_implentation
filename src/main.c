@@ -12,7 +12,6 @@
 #include <openblas/cblas.h>
 #include "MPI_Syrk_implementation.h"
 
-int ALGO = 0;
 
 
 /**
@@ -235,14 +234,13 @@ void syrkIterative(run_config *s, int rank, int *index_arr, float **rank_input, 
         for (long col = 0; col < s->m; ++col) {
             // run for slice of the input:
             for (long c = 0; c < index_arr[rank]; ++c) {
-                rank_result[row * s->m + col] += *(rank_input[row] + c) * rank_input_t[c * s->m + col];
+                rank_result[row * s->m + col] += rank_input[row][c] * rank_input_t[c * s->m + col];
             }
         }
     }
 }
 
-void
-improved_syrkIterative(run_config *s, int rank, const int *index_arr, float **rank_input, const float rank_input_t[],
+void improved_syrkIterative(run_config *s, int rank, const int *index_arr, float **rank_input, const float rank_input_t[],
                        float rank_result[]) {
 
     for (int row = 0; row < s->m; ++row) {
@@ -251,7 +249,7 @@ improved_syrkIterative(run_config *s, int rank, const int *index_arr, float **ra
             //log_debug("middle for loop : col = %d; run_config.n = %d", col, s->m);
             for (int c = 0; c < index_arr[rank]; ++c) {
 
-                rank_result[row * s->m + col] += *(rank_input[row] + c) * rank_input_t[c * s->m + col];
+                rank_result[row * s->m + col] += rank_input[row][c] * rank_input_t[c * s->m + col];
             }
         }
     }
@@ -418,9 +416,11 @@ void parseInput(run_config *s, int argc, char **argv, int rank) {
                 break;
             case 'm':
                 s->m = (int) strtol(optarg, &end, 10);
+                M = s->m;
                 break;
             case 'n':
                 s->n = (int) strtol(optarg, &end, 10);
+                N = s->n;
                 break;
             case 'o':
                 s->result_File = optarg;

@@ -5,6 +5,8 @@
 #ifndef MPI_SYRK_IMPLEMENTATION_MPI_SYRK_IMPLEMENTATION_H
 #define MPI_SYRK_IMPLEMENTATION_MPI_SYRK_IMPLEMENTATION_H
 
+int ALGO = 0;
+
 typedef struct {
     int m;
     int n;
@@ -56,7 +58,7 @@ void computeInputAndTransposed(run_config *s, int rank, int *index_arr, float *i
 
 void syrkIterative(run_config *s, int rank, int *index_arr, float** rank_input, float* rank_input_t, float* rank_result);
 
-void improved_syrkIterative(run_config *s, int rank, const int *index_arr, float** rank_input,
+void improved_syrkIterative(run_config *s, int rank, const int *index_arr, float **rank_input,
                             const float rank_input_t[], float rank_result[]);
 
 void syrk_withOpenBLAS(run_config *config, int rank, int *index_arr, float **rank_input, float *rank_result);
