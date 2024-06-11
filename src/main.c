@@ -32,7 +32,6 @@ int main(int argc, char *argv[]) {
     int world_size, rank;
 
     MPI_Init(&argc, &argv);
-
 //    int debug = 0;
 //    while (!debug)
 //        sleep(5);
@@ -40,24 +39,33 @@ int main(int argc, char *argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    int index_arr[world_size];
+    int *index_arr = (int *) calloc(world_size, sizeof(int));
     if (argc <= 5) {
         error_exit(rank, argv[0], "To many or not enough input variables!");
     }
 
     parseInput(&config, argc, argv, rank);
 
+
     log_info("Size = %d (SIZE_MAX = %zu) => %zu", config.m * config.n, SIZE_MAX, config.m * config.n * sizeof(float));
     //input_matrix_in_array_form
+    if (rank == 0) {
+        log_debug("[int] config.m * config.n = %d", config.m * config.n);
+        log_debug("[long] config.m * config.n = %ld", config.m * config.n);
+    }
     float *input = (float *) calloc(config.m * config.n, sizeof(float));
     if (!input) {
-        log_fatal("Memory allocation failed for input");
+        log_debug("Memory allocation failed for input");
         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
 
 
     //read the input matrix A:
-    read_input_file(rank, &config, input);
+    if (rank == 0) {
+        read_input_file(rank, &config, input);
+    }
+    MPI_Bcast(input, config.m * config.n, MPI_FLOAT, 0, MPI_COMM_WORLD);
+
 
     //check the size of col that each node gets
     log_trace("rank = %d, size = %d * m", rank, index_arr[rank]);
@@ -78,6 +86,10 @@ int main(int argc, char *argv[]) {
     }
 
     //transposed input matrix for each node:
+    if (rank == 0) {
+        log_debug("[int] config.m * index_arr[rank] = %d", config.m * index_arr[rank]);
+        log_debug("[long] config.m * index_arr[rank] = %ld", config.m * index_arr[rank]);
+    }
     float *rank_input_t = (float *) calloc(config.m * index_arr[rank], sizeof(float));
     if (!rank_input_t) {
         log_fatal("Memory allocation failed for input");
@@ -88,7 +100,7 @@ int main(int argc, char *argv[]) {
     // which consists of the columns and all rows in that column:
     computeInputAndTransposed(&config, rank, index_arr, input, rank_input, rank_input_t);
 
-    double start = MPI_Wtime();
+
 
     // SYRK:
     // Compute the result matrix for each node which gets
@@ -96,46 +108,52 @@ int main(int argc, char *argv[]) {
     //  and store the result in rank_result
     log_trace(" config.m * config.m < INT_MAX == %d", config.m * config.m < INT_MAX);
     long test = config.m * config.m;
-    log_trace("Test config.m = %d; config.m * config.m = %lld",config.m, test);
+    log_trace("Test config.m = %d; config.m * config.m = %lld", config.m, test);
     float *rank_result = (float *) calloc(test, sizeof(float));
     if (!rank_result) {
         log_fatal("[processor %d] Memory allocation failed for input with errno", rank);
         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
 
+    double start = MPI_Wtime();
     switch (ALGO) {
         case 0:
             syrkIterative(&config, rank, index_arr, rank_input, rank_input_t, rank_result);
             break;
         case 1:
-            improved_syrkIterative(&config, rank, index_arr, *rank_input, rank_input_t, rank_result);
+            improved_syrkIterative(&config, rank, index_arr, rank_input, rank_input_t, rank_result);
             break;
         case 2:
-            syrk_withOpenBLAS(&config, rank, index_arr, *rank_input, rank_result);
+            syrk_withOpenBLAS(&config, rank, index_arr, rank_input, rank_result);
             break;
         default:
             log_fatal("no SYRK operator selected --> error ALOG %d not in [0..2]", ALGO);
             error_exit(rank, argv[0], "no SYRK operator selected");
     }
     log_info("syrk Successful");
+    log_fatal("Syrk algo(%d) took %f sec", ALGO, MPI_Wtime() - start);
 
-    int counts[world_size];
+
+    int *counts = (int *) calloc(world_size, sizeof(int));
     index_calculation(counts, config.m * config.m, world_size);
     log_info("index_calculation Successful");
 
     int *reduction_result = (int *) calloc(counts[rank], sizeof(int));
-    for (int n = 0; n < counts[rank]; ++n) {
-        reduction_result[n] = 0;
-    }
+
+    double start_mpi_reduce_scatter = MPI_Wtime();
 
     int result = MPI_Reduce_scatter(rank_result, reduction_result, counts, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
     if (result != MPI_SUCCESS) {
         log_error("MPI_Reduce_scatter returned exit coed %d", result);
     }
     log_info("MPI_Reduce_scatter Successful");
+    double runtime_mpi_reduce_scatter = MPI_Wtime() - start_mpi_reduce_scatter;
+    log_debug("[rank %d]: MPI_Reduce_scatter took %f sec",rank, runtime_mpi_reduce_scatter);
 
     if (rank == 0) {
         log_debug("m = %d", config.m);
+        log_debug("[int] config.m * config.m = %d", config.m * config.m);
+        log_debug("[long] config.m * config.m = %ld", config.m * config.m);
         float *buffer = (float *) calloc(config.m * config.m, sizeof(float));
         if (!buffer) {
             log_error("Memory allocation failed for input with errno");
@@ -167,7 +185,7 @@ int main(int argc, char *argv[]) {
 
         //Print the result:
         printf("Values gathered in the buffer on process %d:\n", rank);
-        printf("The process took %f seconds to run.\n", (runtime));
+        printf("The process took %f seconds to run.\n", runtime);
 
         printResult(&config, config.m, buffer);
 
@@ -178,12 +196,14 @@ int main(int argc, char *argv[]) {
         log_info("[if rank == 0]: Successfully freed -> displacements...");
     } else {
         int status;
-        if ((status = MPI_Gatherv(reduction_result, counts[rank], MPI_FLOAT, NULL, NULL, NULL, MPI_FLOAT, 0,
-                                  MPI_COMM_WORLD)) != MPI_SUCCESS) {
+        status = MPI_Gatherv(reduction_result, counts[rank], MPI_FLOAT, NULL, NULL, NULL, MPI_FLOAT, 0, MPI_COMM_WORLD);
+        if (status != MPI_SUCCESS) {
             log_error("MPI_Gatherv returned %d", status);
         }
     }
 
+    free(index_arr);
+    log_info("Successfully freed the buffer -> index_arr");
     free(reduction_result);
     log_info("Successfully freed the buffer -> reduction_result");
     free(input);
@@ -207,69 +227,37 @@ int main(int argc, char *argv[]) {
 
 void syrkIterative(run_config *s, int rank, int *index_arr, float **rank_input, float rank_input_t[],
                    float *rank_result) {
-    // set all array entries to 0:
     log_debug("start syrkIterative:");
-    for (int i = 0; i < s->m; ++i) {
-        for (int j = 0; j < s->m; ++j) {
-            rank_result[i * s->m + j] = 0;
-        }
-    }
-    log_error("index_arr[rank = %d] == %d", rank, index_arr[rank]);
+    log_info("index_arr[rank = %d] == %d", rank, index_arr[rank]);
     // for each result row:
-    for (int row = 0; row < s->m; ++row) {
-        if (rank == 2) log_error("row == %d", row);
-        //log_info("row (%d)", row);
-        //log_debug("outer for loop : row = %d; run_config.m = %d", row, s->m);
+    for (long row = 0; row < s->m; ++row) {
         // for each result column
-        for (int col = 0; col < s->m; ++col) {
-            //log_debug("middle for loop : col = %d; run_config.n = %d", col, s->m);
+        for (long col = 0; col < s->m; ++col) {
             // run for slice of the input:
-            for (int c = 0; c < index_arr[rank]; ++c) {
-                log_debug("c = %d", c);
-                if (rank == 1)
-                    log_debug("rank_result[%d] = %f * %f + %f;", row * s->m + col,
-                              rank_input[c + row * index_arr[rank]],
-                              rank_input_t[c * s->m + col], rank_result[row * s->m + col]);
-
-                rank_result[row * s->m + col] =
-                        *(rank_input[row] + c) * rank_input_t[c * s->m + col] + rank_result[row * s->m + col];
-
-                log_trace("rank = %d; i = %d j = %d; result = %d", rank, row, col, rank_result[row * s->m + col]);
-                log_trace("rank = %d; i = %d j = %d; result = %d", rank, row, col, rank_result[row * s->m + col]);
+            for (long c = 0; c < index_arr[rank]; ++c) {
+                rank_result[row * s->m + col] += *(rank_input[row] + c) * rank_input_t[c * s->m + col];
             }
         }
     }
 }
 
-void improved_syrkIterative(run_config *s, int rank, const int *index_arr, const float rank_input[], const float rank_input_t[],
-                            float rank_result[]) {
-    // set all array entries to 0:
-//    log_fatal("Test %p", &rank_result);
-//    for (int i = 0; i < s->m; ++i) {
-//        for (int j = 0; j < s->m; ++j) {
-//            assert(&rank_result[(s->m - 1) * s->m + (s->m -1)] != NULL);
-//            rank_result[i * s->m + j] = 0;
-//        }
-//    }
-//    log_fatal("Test set all array entries to 0");
+void
+improved_syrkIterative(run_config *s, int rank, const int *index_arr, float **rank_input, const float rank_input_t[],
+                       float rank_result[]) {
+
     for (int row = 0; row < s->m; ++row) {
         //log_debug("outer for loop : row = %d; run_config.m = %d", row, s->m);
         for (int col = row; col < s->m; ++col) {
             //log_debug("middle for loop : col = %d; run_config.n = %d", col, s->m);
             for (int c = 0; c < index_arr[rank]; ++c) {
-                log_debug("c = %d", c);
-                if (rank == 1) log_debug("rank_result[%d] = %f * %f + %f;", row * s->m + col, rank_input[c + row*index_arr[rank]],
-                                         rank_input_t[c*s->m  + col], rank_result[row * s->m + col]);
-                rank_result[row * s->m + col] =
-                        rank_input[c + row*index_arr[rank]] * rank_input_t[c*s->m  + col] + rank_result[row * s->m + col];
-                log_trace("rank = %d; i = %d j = %d; result = %d", rank, row, col, rank_result[row * s->m + col]);
-                log_trace("rank = %d; i = %d j = %d; result = %d", rank, row, col, rank_result[row * s->m + col]);
+
+                rank_result[row * s->m + col] += *(rank_input[row] + c) * rank_input_t[c * s->m + col];
             }
         }
     }
 }
 
-void syrk_withOpenBLAS(run_config *config, int rank, int *index_arr, float *rank_input, float *rank_result) {
+void syrk_withOpenBLAS(run_config *config, int rank, int *index_arr, float **rank_input, float *rank_result) {
     cblas_ssyrk(
             CblasRowMajor,
             CblasUpper,
@@ -277,7 +265,7 @@ void syrk_withOpenBLAS(run_config *config, int rank, int *index_arr, float *rank
             config->m,
             index_arr[rank],
             1.0f,
-            rank_input,
+            *rank_input,
             index_arr[rank],
             0.0f,
             rank_result,
@@ -392,9 +380,9 @@ void printResult(run_config *s, int cols, float *array) {
         for (int i = j * cols; i < j * cols + cols; ++i) {
             log_debug("%f", array[i]);
             if (i == j * cols + cols - 1) {
-                fprintf(file, "%f", array[i]);
+                fprintf(file, "%0.0f", array[i]);
             } else {
-                fprintf(file, "%f; ", array[i]);
+                fprintf(file, "%0.0f; ", array[i]);
             }
 
         }

@@ -11,9 +11,9 @@ folder_path="/Users/johannes/Downloads/test_data"
 # Output file for collected results (replace with your desired filename)
 output_file="results.csv"
 
-number_of_runs=1
+number_of_runs=2
 max_number_of_processors=6
-max_number_of_algorithm=2
+max_number_of_algorithm=1
 
 # Clear the output file (optional)
 echo "" > "$output_file"
