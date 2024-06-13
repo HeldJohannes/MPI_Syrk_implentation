@@ -101,14 +101,12 @@ int main(int argc, char *argv[]) {
     // Compute the result matrix for each node which gets
     //  summed up by the MPI_Reduce_scatter() methode 
     //  and store the result in rank_result
-    float **rank_result = (float **) calloc(config.m, sizeof(float *));
-    for (long i = 0; i < config.m; ++i) {
-        rank_result[i] = (float *) calloc(config.m, sizeof(float));
-        if (!rank_result[i]) {
+    float *rank_result = (float *) calloc(config.m*config.m, sizeof(float));
+        if (!rank_result) {
             log_fatal("[processor %d] Memory allocation failed for input with errno", rank);
             MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
         }
-    }
+
 
     double start = MPI_Wtime();
     switch (ALGO) {
@@ -225,7 +223,7 @@ int main(int argc, char *argv[]) {
 }
 
 void syrkIterative(run_config *s, int rank, int *index_arr, float **rank_input, float **rank_input_t,
-                   float **rank_result) {
+                   float *rank_result) {
     log_debug("start syrkIterative:");
     log_debug("index_arr[rank = %d] == %d", rank, index_arr[rank]);
     // for each result row:
@@ -234,14 +232,14 @@ void syrkIterative(run_config *s, int rank, int *index_arr, float **rank_input, 
         for (long col = 0; col < s->m; ++col) {
             // run for slice of the input:
             for (long c = 0; c < index_arr[rank]; ++c) {
-                rank_result[row][col] += rank_input[row][c] * rank_input_t[c][col];
+                rank_result[row * s->m + col] += rank_input[row][c] * rank_input_t[c][col];
             }
         }
     }
 }
 
 void improved_syrkIterative(run_config *s, int rank, const int *index_arr, float **rank_input, float **rank_input_t,
-                            float **rank_result) {
+                            float *rank_result) {
 
     for (int row = 0; row < s->m; ++row) {
         //log_debug("outer for loop : row = %d; run_config.m = %d", row, s->m);
@@ -249,13 +247,13 @@ void improved_syrkIterative(run_config *s, int rank, const int *index_arr, float
             //log_debug("middle for loop : col = %d; run_config.n = %d", col, s->m);
             for (int c = 0; c < index_arr[rank]; ++c) {
 
-                rank_result[row][col] += rank_input[row][c] * rank_input_t[c][col];
+                rank_result[row * s->m + col] += rank_input[row][c] * rank_input_t[c][col];
             }
         }
     }
 }
 
-void syrk_withOpenBLAS(run_config *config, int rank, int *index_arr, float **rank_input, float **rank_result) {
+void syrk_withOpenBLAS(run_config *config, int rank, int *index_arr, float **rank_input, float *rank_result) {
     cblas_ssyrk(
             CblasRowMajor,
             CblasUpper,
@@ -266,7 +264,7 @@ void syrk_withOpenBLAS(run_config *config, int rank, int *index_arr, float **ran
             *rank_input,
             (int) index_arr[rank],
             0.0f,
-            *rank_result,
+            rank_result,
             config->m);
 }
 
