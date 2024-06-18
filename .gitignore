@@ -57,3 +57,4 @@ dkms.conf
 /cmake-build-default/*
 result.csv
 results.csv
+syrk_result.csv
