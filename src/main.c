@@ -12,10 +12,6 @@
 #include <openblas/cblas.h>
 #include "MPI_Syrk_implementation.h"
 
-int read_input_file(int rank, run_config *s, float **A);
-void computeInputAndTransposed(run_config *s, int rank, int *index_arr, float **input, float **rank_input,
-                               float **rank_input_t);
-
 /**
  *
  *
