@@ -12,6 +12,9 @@
 #include <openblas/cblas.h>
 #include "MPI_Syrk_implementation.h"
 
+int read_input_file(int rank, run_config *s, float **A);
+void computeInputAndTransposed(run_config *s, int rank, int *index_arr, float **input, float **rank_input,
+                               float **rank_input_t);
 
 /**
  *
@@ -22,7 +25,6 @@
  * @return 0 if successful
  */
 int main(int argc, char *argv[]) {
-
 
     // setup:
     log_set_level(LOG_INFO);
@@ -47,22 +49,29 @@ int main(int argc, char *argv[]) {
 
     log_debug("Size = %d (SIZE_MAX = %zu) => %zu", config.m * config.n, SIZE_MAX, config.m * config.n * sizeof(float));
     //input_matrix_in_array_form
-    if (rank == 0) {
-        log_debug("[int] config.m * config.n = %d", config.m * config.n);
-        log_debug("[long] config.m * config.n = %ld", config.m * config.n);
+    float **input = (float **) calloc(config.m * config.n, sizeof(float *));
+    for (int i = 0; i < config.m; ++i) {
+        input[i] = (float *) calloc(config.n, sizeof(float ));
+        if (input[i] == NULL) {
+            log_fatal("Memory allocation failed for input");
+            MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+        }
     }
-    float *input = (float *) calloc(config.m * config.n, sizeof(float));
-    if (!input) {
-        log_fatal("Memory allocation failed for input");
-        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-    }
+
+//    if (input == NULL) {
+//        log_fatal("Memory allocation failed for input");
+//        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+//    }
 
 
     //read the input matrix A:
     if (rank == 0) {
         read_input_file(rank, &config, input);
     }
-    MPI_Bcast(input, config.m * config.n, MPI_FLOAT, 0, MPI_COMM_WORLD);
+    for (int i = 0; i < config.m; ++i) {
+        MPI_Bcast(input[i], config.n, MPI_FLOAT, 0, MPI_COMM_WORLD);
+    }
+
 
 
     // calculate how many cols each node gets
@@ -95,6 +104,12 @@ int main(int argc, char *argv[]) {
     // which consists of the columns and all rows in that column:
     computeInputAndTransposed(&config, rank, index_arr, input, rank_input, rank_input_t);
 
+    // input no longer needed
+    for (int i = 0; i < config.m; ++i) {
+        free(input[i]);
+    }
+    free(input);
+    log_debug("Successfully freed the buffer -> input");
 
 
     // SYRK:
@@ -203,8 +218,6 @@ int main(int argc, char *argv[]) {
     log_debug("Successfully freed the buffer -> index_arr");
     free(reduction_result);
     log_debug("Successfully freed the buffer -> reduction_result");
-    free(input);
-    log_debug("Successfully freed the buffer -> input");
     free(rank_input);
     log_debug("Successfully freed the buffer -> rank_input");
     free(rank_input_t);
@@ -268,7 +281,7 @@ void syrk_withOpenBLAS(run_config *config, int rank, int *index_arr, float **ran
             config->m);
 }
 
-void computeInputAndTransposed(run_config *s, int rank, int *index_arr, float *input, float **rank_input,
+void computeInputAndTransposed(run_config *s, int rank, int *index_arr, float **input, float **rank_input,
                                float **rank_input_t) {
     int rank_count = 0;
     for (int i = 0; i < rank; ++i) {
@@ -277,20 +290,20 @@ void computeInputAndTransposed(run_config *s, int rank, int *index_arr, float *i
     }
     log_trace("index_arr[rank] = %d", index_arr[rank]);
 
-    for (int row_count = 0; row_count < s->m; row_count++) {
-
-        float *tmp = &input[(rank_count) + row_count * s->n];
-        rank_input[row_count] = tmp;
-        log_debug("&input[(rank_count) + row_count * s->n] = %p => %f", tmp, *tmp);
-        log_debug("rank_input[row_count] = %p => %f", rank_input[row_count], *rank_input[row_count]);
-
+    for (int row = 0; row < s->m; row++) {
+        for (int col = 0; col < index_arr[rank]; ++col) {
+            float tmp = input[row][rank_count + col];
+            rank_input[row][col] = tmp;
+            log_debug("&input[(rank_count) + row_count * s->n] = %p => %f", &tmp, tmp);
+            log_debug("rank_input[row_count] = %p => %f", rank_input[row], *rank_input[row]);
+        }
     }
     log_debug("for loop success");
 
     transposeMatrix(s->m, index_arr[rank], rank_input, rank_input_t);
 }
 
-int read_input_file(const int rank, run_config *s, float *A) {
+int read_input_file(const int rank, run_config *s, float **A) {
 //    MPI_File mpiFile;
 //    if (MPI_File_open(MPI_COMM_WORLD, s->fileName, MPI_MODE_RDONLY, MPI_INFO_NULL, &mpiFile)) {
 //        printf("[MPI process %d] Failure in opening the file.\n", rank);
@@ -315,7 +328,8 @@ int read_input_file(const int rank, run_config *s, float *A) {
 
     char *line = NULL;
     size_t len = 0;
-    int counter = 0;
+    int row = 0;
+    int col = 0;
     while (1) {
         ssize_t n = getline(&line, &len, stream);
         log_debug("ssize_t n = %d", n);
@@ -325,15 +339,17 @@ int read_input_file(const int rank, run_config *s, float *A) {
             char *pEnd;
             float res = strtof(subtoken, &pEnd);
             if (res > FLT_MIN || res < FLT_MAX) {
-                A[counter] = res;
+                A[row][col] = res;
             } else {
                 log_error("Input is not an float --> Abort");
                 MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
             }
-            //log_trace("[MPI process %d] input[%d] = %d", rank, counter, A[counter]);
-            counter++;
+            //log_trace("[MPI process %d] input[%d] = %d", rank, row, A[row]);
+            col++;
             subtoken = strtok(NULL, ";");
         }
+        col = 0;
+        row++;
     }
 
     fclose(stream);

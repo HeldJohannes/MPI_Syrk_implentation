@@ -32,7 +32,7 @@ args <- commandArgs(trailingOnly = TRUE)
 
 # Check if required arguments are provided
 if (length(args) < 2) {
-  stop("Error: Missing required arguments. Usage: computeAndSave.R <output_file> <m> <n>")
+  stop("Error: Missing required arguments. Usage: GenerateTestdata.R <output_file> <m> <n>")
 }
 
 # Extract file path, m, and n from arguments

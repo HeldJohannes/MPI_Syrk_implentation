@@ -34,7 +34,7 @@ int read_input(run_config *s, int argc, char* argv[]);
  * @param rank The rank of the current processor
  * @return EXIT_SUCCESS if the file is read successfully, otherwise an error code.
  */
-int read_input_file(const int rank, run_config *s, float *A);
+//int read_input_file(const int rank, run_config *s, float *A);
 
 /**
  * This function is used to print error messages and exit the program.
@@ -54,7 +54,7 @@ void index_calculation(int *arr, long n, int world_size);
 
 void readInputFile(int *input, int rank, char **argv);
 
-void computeInputAndTransposed(run_config *config, int rank, int* index_arr, float* input, float** rank_input, float** rank_input_t);
+//void computeInputAndTransposed(run_config *config, int rank, int* index_arr, float* input, float** rank_input, float** rank_input_t);
 
 void syrkIterative(run_config *config, int rank, int* index_arr, float** rank_input, float** rank_input_t, float* rank_result);
 
