@@ -12,6 +12,8 @@
 #include <openblas/cblas.h>
 #include "MPI_Syrk_implementation.h"
 
+_Bool PRINT_RESULT = false;
+
 /**
  *
  *
@@ -119,7 +121,10 @@ int main(int argc, char *argv[]) {
         }
 
 
+    // Synchronize before starting time
+    MPI_Barrier(MPI_COMM_WORLD);
     double start = MPI_Wtime();
+
     switch (ALGO) {
         case 0:
             syrkIterative(&config, rank, index_arr, rank_input, rank_input_t, rank_result);
@@ -134,7 +139,15 @@ int main(int argc, char *argv[]) {
             log_fatal("no SYRK operator selected --> error ALOG %d not in [0..2]", ALGO);
             error_exit(rank, argv[0], "no SYRK operator selected");
     }
+    // Synchronize again before obtaining the time
+    //MPI_Barrier(MPI_COMM_WORLD);
     log_info("Syrk algo(%d) took %f sec", ALGO, MPI_Wtime() - start);
+    free(index_arr);
+    log_debug("Successfully freed the buffer -> index_arr");
+    free(rank_input);
+    log_debug("Successfully freed the buffer -> rank_input");
+    free(rank_input_t);
+    log_debug("Successfully freed the buffer -> rank_input_t");
 
 
     int *counts = (int *) calloc(world_size, sizeof(int));
@@ -192,11 +205,15 @@ int main(int argc, char *argv[]) {
         printf("Values gathered in the buffer on process %d:\n", rank);
         printf("The process took %f seconds to run.\n", runtime);
 
-        double start_print_results = MPI_Wtime();
-        printResult(&config, config.m, buffer);
-        double runtime_print_results = MPI_Wtime() - start_print_results;
-        log_info("runtime_print_results = %f", runtime_print_results);
+        if (PRINT_RESULT) {
+            // No synchronization needed because only processor 0 operates here
+            double start_print_results = MPI_Wtime();
 
+            printResult(&config, config.m, buffer);
+
+            double runtime_print_results = MPI_Wtime() - start_print_results;
+            log_info("runtime_print_results = %f", runtime_print_results);
+        }
 
         free(buffer);
         log_debug("[if rank == 0]: Successfully freed -> buffer...");
@@ -210,14 +227,9 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    free(index_arr);
-    log_debug("Successfully freed the buffer -> index_arr");
     free(reduction_result);
     log_debug("Successfully freed the buffer -> reduction_result");
-    free(rank_input);
-    log_debug("Successfully freed the buffer -> rank_input");
-    free(rank_input_t);
-    log_debug("Successfully freed the buffer -> rank_input_t");
+
     free(rank_result);
     log_debug("Successfully freed the buffer -> rank_result");
 
@@ -263,6 +275,16 @@ void improved_syrkIterative(run_config *s, int rank, const int *index_arr, float
 }
 
 void syrk_withOpenBLAS(run_config *config, int rank, int *index_arr, float **rank_input, float *rank_result) {
+    float *A = (float *) calloc(config->m * index_arr[rank], sizeof(float));
+    if (A == NULL) {
+        log_error("Calloc failed");
+        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    }
+    for (int i = 0; i < config->m; ++i) {
+        for (int j = 0; j < index_arr[rank]; ++j) {
+            A[i * index_arr[rank] + j] = rank_input[i][j];
+        }
+    }
     cblas_ssyrk(
             CblasRowMajor,
             CblasUpper,
@@ -270,7 +292,7 @@ void syrk_withOpenBLAS(run_config *config, int rank, int *index_arr, float **ran
             config->m,
             (int) index_arr[rank],
             1.0f,
-            *rank_input,
+            A,
             (int) index_arr[rank],
             0.0f,
             rank_result,

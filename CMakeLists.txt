@@ -28,6 +28,7 @@ endif (!MPI_FOUND)
 
 # link openBlas
 set(BLA_VENDOR OpenBLAS)
+include_directories(/opt/homebrew/opt/openblas/lib)
 set(BLA_INCLUDE_DIRS /opt/homebrew/include)
 find_package(BLAS REQUIRED GLOBAL)
 message("Found BLAS LIBARIES: " ${BLAS_FOUND} " -> " ${BLAS_LIBRARIES})
