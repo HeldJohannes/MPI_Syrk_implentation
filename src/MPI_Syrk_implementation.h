@@ -50,7 +50,7 @@ void parseInput(run_config *s, int argc, char **argv, int rank);
 
 void printResult(run_config *s, int cols, float* array);
 
-void index_calculation(int *arr, long n, int world_size);
+void index_calculation(int *arr, long n, int p);
 
 void readInputFile(int *input, int rank, char **argv);
 

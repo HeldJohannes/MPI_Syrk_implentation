@@ -3,8 +3,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdarg.h>
-#include <assert.h>
-#include <limits.h>
 #include <mpi.h>
 #include <time.h>
 #include <float.h>
@@ -12,7 +10,7 @@
 #include <openblas/cblas.h>
 #include "MPI_Syrk_implementation.h"
 
-_Bool PRINT_RESULT = false;
+_Bool PRINT_RESULT = true;
 
 /**
  *
@@ -46,7 +44,7 @@ int main(int argc, char *argv[]) {
 
     log_debug("Size = %d (SIZE_MAX = %zu) => %zu", config.m * config.n, SIZE_MAX, config.m * config.n * sizeof(float));
     //input_matrix_in_array_form
-    float **input = (float **) calloc(config.m * config.n, sizeof(float *));
+    float **input = (float **) calloc(config.m, sizeof(float *));
     for (int i = 0; i < config.m; ++i) {
         input[i] = (float *) calloc(config.n, sizeof(float));
         if (input[i] == NULL) {
@@ -135,9 +133,9 @@ int main(int argc, char *argv[]) {
     // SYRK:
     // Compute the result matrix for each node which gets
     //  summed up by the MPI_Reduce_scatter() methode 
-    //  and store the result in rank_result
-    float *rank_result = (float *) calloc((long) config.m * config.m, sizeof(float));
-    if (!rank_result) {
+    //  and store the result in rank_syrk_result
+    float *rank_syrk_result = (float *) calloc((long) config.m * config.m, sizeof(float));
+    if (!rank_syrk_result) {
         log_fatal("[processor %d] Memory allocation failed for input with errno", rank);
         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
@@ -149,13 +147,13 @@ int main(int argc, char *argv[]) {
 
     switch (ALGO) {
         case 0:
-            syrkIterative(&config, rank, index_arr_rank, rank_input, rank_input_t, rank_result);
+            syrkIterative(&config, rank, index_arr_rank, rank_input, rank_input_t, rank_syrk_result);
             break;
         case 1:
-            improved_syrkIterative(&config, rank, index_arr_rank, rank_input, rank_input_t, rank_result);
+            improved_syrkIterative(&config, rank, index_arr_rank, rank_input, rank_input_t, rank_syrk_result);
             break;
         case 2:
-            syrk_withOpenBLAS(&config, rank, index_arr_rank, rank_input, rank_result);
+            syrk_withOpenBLAS(&config, rank, index_arr_rank, rank_input, rank_syrk_result);
             break;
         default:
             log_fatal("no SYRK operator selected --> error ALOG %d not in [0..2]", ALGO);
@@ -178,15 +176,25 @@ int main(int argc, char *argv[]) {
 
     double start_mpi_reduce_scatter = MPI_Wtime();
 
-    int result = MPI_Reduce_scatter(rank_result, reduction_result, counts, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+//    float *buffer = NULL;
+//    if (rank == 0) {
+//        buffer = (float *) calloc(config.m * config.m, sizeof(float));
+//    }
+    //int result = MPI_Reduce(rank_syrk_result, buffer, config.m * config.m, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+    int result = MPI_Reduce_scatter(rank_syrk_result, reduction_result, counts, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
     if (result != MPI_SUCCESS) {
         log_error("MPI_Reduce_scatter returned exit coed %d", result);
     }
 
     double runtime_mpi_reduce_scatter = MPI_Wtime() - start_mpi_reduce_scatter;
-    log_debug("[rank %d]: MPI_Reduce_scatter took %f sec", rank, runtime_mpi_reduce_scatter);
+    //log_debug("[rank %d]: MPI_Reduce_scatter took %f sec", rank, runtime_mpi_reduce_scatter);
+    log_debug("[rank %d]: MPI_Reduce took %f sec", rank, runtime_mpi_reduce_scatter);
 
     if (rank == 0) {
+        double runtime = MPI_Wtime() - start;
+        printf("The process took %f seconds to run.\n", runtime);
+
         log_debug("m = %d", config.m);
         log_debug("[int] config.m * config.m = %d", config.m * config.m);
         log_debug("[long] config.m * config.m = %ld", config.m * config.m);
@@ -220,11 +228,10 @@ int main(int argc, char *argv[]) {
         }
 
 
-        double runtime = MPI_Wtime() - start;
+
 
         //Print the result:
         printf("Values gathered in the buffer on process %d:\n", rank);
-        printf("The process took %f seconds to run.\n", runtime);
 
         if (PRINT_RESULT) {
             // No synchronization needed because only processor 0 operates here
@@ -251,8 +258,8 @@ int main(int argc, char *argv[]) {
     free(reduction_result);
     log_debug("Successfully freed the buffer -> reduction_result");
 
-    free(rank_result);
-    log_debug("Successfully freed the buffer -> rank_result");
+    free(rank_syrk_result);
+    log_debug("Successfully freed the buffer -> rank_syrk_result");
 
     log_info("[rank %d] finished the program --> MPI_Finalize()", rank);
     // finish the program:
@@ -390,13 +397,13 @@ int read_input_file(const int rank, run_config *s, float **A) {
     return EXIT_SUCCESS;
 }
 
-void index_calculation(int *arr, long n, int world_size) {
-    long input_size = n / world_size;
+void index_calculation(int *arr, long n, int p) {
+    long input_size = n / p;
 
-    long rest = n % world_size;
+    long rest = n % p;
     log_trace("rest = %d", rest);
 
-    for (int i = 0; i < world_size; ++i) {
+    for (int i = 0; i < p; ++i) {
         arr[i] = (int) input_size;
         if (i < rest) {
             arr[i] += 1;
