@@ -10,7 +10,7 @@
 #include <openblas/cblas.h>
 #include "MPI_Syrk_implementation.h"
 
-_Bool PRINT_RESULT = true;
+_Bool PRINT_RESULT = false;
 
 /**
  *
@@ -23,7 +23,7 @@ _Bool PRINT_RESULT = true;
 int main(int argc, char *argv[]) {
 
     // setup:
-    log_set_level(LOG_INFO);
+    log_set_level(LOG_FATAL);
     static run_config config;
     int world_size, rank;
 
@@ -231,7 +231,7 @@ int main(int argc, char *argv[]) {
 
 
         //Print the result:
-        printf("Values gathered in the buffer on process %d:\n", rank);
+        log_info("Values gathered in the buffer on process %d\n", rank);
 
         if (PRINT_RESULT) {
             // No synchronization needed because only processor 0 operates here
@@ -434,7 +434,7 @@ void printResult(run_config *s, int cols, float *array) {
         fprintf(file, "\n");
     }
 
-    log_info("Finished printResults()");
+    log_debug("Finished printResults()");
 }
 
 /**

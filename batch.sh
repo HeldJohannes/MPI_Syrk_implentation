@@ -13,7 +13,7 @@ output_file="results.csv"
 
 number_of_runs=2
 max_number_of_processors=6
-max_number_of_algorithm=1
+max_number_of_algorithm=3
 
 # Clear the output file (optional)
 echo "" > "$output_file"
@@ -21,11 +21,11 @@ echo "" > "$output_file"
 # Header row for the CSV (modify column names if needed)
 echo "algorithm;number_of_processors;matrix_size_m;matrix_size_n;run_number;run_time" > "$output_file"
 
-for (( a = 0; a <= max_number_of_algorithm; a++ )); do
+for (( a = 0; a < max_number_of_algorithm; a++ )); do
 
   for (( i = 1; i <= max_number_of_processors; i++ )); do
 
-  echo "number of processors = $i"
+  printf "number of processors = %d\n" i
 
     # Loop through each file in the folder
     for file in "${folder_path}"/*; do
@@ -48,6 +48,7 @@ for (( a = 0; a <= max_number_of_algorithm; a++ )); do
           run_time=$(grep -Eo '[0-9]+\.[0-9]+' <<< cat /tmp/script_output.txt)
 
           # Print data in CSV format (modify column order if needed)
+          # algorithm;number_of_processors;matrix_size_m;matrix_size_n;run_number;run_time
           echo "$a;$i;$m;$n;$((j + 1));$run_time" >> "$output_file"
         done
       fi
