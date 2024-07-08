@@ -97,7 +97,7 @@ Rscript --vanilla ./resource/Check.R ./syrk_result.csv ./resource/input/test60x4
 You can use the R script in the test folder to generate testdata:
 
 ```
-Rscript --vanilla ./test/GernateTestdata.R <dir_to_safe> <Number of Rows (m)> <Number of Cols (n)>
+Rscript --vanilla ./resourec/GernateTestdata.R <dir_to_safe> <Number of Rows (m)> <Number of Cols (n)>
 ```
 
 ## Helpful Links

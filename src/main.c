@@ -3,8 +3,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdarg.h>
-#include <assert.h>
-#include <limits.h>
 #include <mpi.h>
 #include <time.h>
 #include <float.h>
@@ -25,7 +23,7 @@ _Bool PRINT_RESULT = false;
 int main(int argc, char *argv[]) {
 
     // setup:
-    log_set_level(LOG_INFO);
+    log_set_level(LOG_FATAL);
     static run_config config;
     int world_size, rank;
 
@@ -37,7 +35,6 @@ int main(int argc, char *argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    int *index_arr = (int *) calloc(world_size, sizeof(int));
     if (argc <= 5) {
         error_exit(rank, argv[0], "To many or not enough input variables!");
     }
@@ -47,49 +44,77 @@ int main(int argc, char *argv[]) {
 
     log_debug("Size = %d (SIZE_MAX = %zu) => %zu", config.m * config.n, SIZE_MAX, config.m * config.n * sizeof(float));
     //input_matrix_in_array_form
-    float **input = (float **) calloc(config.m * config.n, sizeof(float *));
+    float **input = (float **) calloc(config.m, sizeof(float *));
     for (int i = 0; i < config.m; ++i) {
-        input[i] = (float *) calloc(config.n, sizeof(float ));
+        input[i] = (float *) calloc(config.n, sizeof(float));
         if (input[i] == NULL) {
             log_fatal("Memory allocation failed for input");
             MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
         }
     }
 
-//    if (input == NULL) {
-//        log_fatal("Memory allocation failed for input");
-//        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-//    }
+    int index_arr_rank;
+    //int cumulate_index_arr_rank;
+    int *index_arr = (int *) calloc(world_size, sizeof(int));
+    if (!index_arr) {
+        log_fatal("Memory allocation failed for cumulate_index_arr");
+        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    }
+    int *cumulate_index_arr = (int *) calloc(world_size, sizeof(int));
+    if (!cumulate_index_arr) {
+        log_fatal("Memory allocation failed for cumulate_index_arr");
+        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    }
 
-
-    //read the input matrix A:
+    // read the input matrix A
+    // and compute the index_array
     if (rank == 0) {
         read_input_file(rank, &config, input);
+        // calculate how many cols each node gets
+        index_calculation(index_arr, config.n, world_size);
+
+        int rank_count = 0;
+        for (int i = 0; i < world_size; ++i) {
+            cumulate_index_arr[i] = rank_count;
+            rank_count += index_arr[i];
+        }
     }
-    for (int i = 0; i < config.m; ++i) {
-        MPI_Bcast(input[i], config.n, MPI_FLOAT, 0, MPI_COMM_WORLD);
-    }
 
-
-
-    // calculate how many cols each node gets
-    index_calculation(index_arr, config.n, world_size);
+    // send index_arr[rank] to all processors and work with index_arr_rank
+    MPI_Scatter(index_arr, 1, MPI_INT, &index_arr_rank, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    // send cumulate_index_arr[rank] to all processors and work with cumulate_index_arr_rank
+    //MPI_Scatter(cumulate_index_arr, 1, MPI_INT, &cumulate_index_arr_rank, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
     //input matrix for each node:
-    log_debug("index_arr[rank] => index_arr[%d] = %d", rank, index_arr[rank]);
-    log_debug("[rank %d] rank_input size = %d x %d", rank, config.m, index_arr[rank]);
     float **rank_input = (float **) calloc(config.m, sizeof(float *));
     for (int i = 0; i < config.m; ++i) {
-        rank_input[i] = (float *) calloc(index_arr[rank], sizeof(float));
+        rank_input[i] = (float *) calloc(index_arr_rank, sizeof(float));
         if (!rank_input[i]) {
             log_fatal("Memory allocation failed for rank_input[%d]", i);
             MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
         }
     }
 
+    for (int i = 0; i < config.m; ++i) {
+        MPI_Scatterv(input[i], index_arr, cumulate_index_arr, MPI_FLOAT, rank_input[i], index_arr_rank, MPI_FLOAT, 0,
+                     MPI_COMM_WORLD);
+    }
+
+    // free index_arr and cumulate_index_arr because they are no longer needed
+    free(index_arr);
+    free(cumulate_index_arr);
+
+    // input no longer needed
+    for (int i = 0; i < config.m; ++i) {
+        free(input[i]);
+    }
+    free(input);
+    log_debug("Successfully freed the buffer -> input");
+
+
     //transposed input matrix for each node:
-    float **rank_input_t = (float **) calloc(index_arr[rank], sizeof(float *));
-    for (int i = 0; i < index_arr[rank]; ++i) {
+    float **rank_input_t = (float **) calloc(index_arr_rank, sizeof(float *));
+    for (int i = 0; i < index_arr_rank; ++i) {
         rank_input_t[i] = (float *) calloc(config.m, sizeof(float));
         if (!rank_input_t[i]) {
             log_fatal("Memory allocation failed for input");
@@ -100,25 +125,20 @@ int main(int argc, char *argv[]) {
 
     // compute the input matrix, and it's transpose,
     // which consists of the columns and all rows in that column:
-    computeInputAndTransposed(&config, rank, index_arr, input, rank_input, rank_input_t);
+    //computeInputAndTransposed(&config, rank, index_arr_rank, cumulate_index_arr_rank, input, rank_input, rank_input_t);
 
-    // input no longer needed
-    for (int i = 0; i < config.m; ++i) {
-        free(input[i]);
-    }
-    free(input);
-    log_debug("Successfully freed the buffer -> input");
+    transposeMatrix(config.m, index_arr_rank, rank_input, rank_input_t);
 
 
     // SYRK:
     // Compute the result matrix for each node which gets
     //  summed up by the MPI_Reduce_scatter() methode 
-    //  and store the result in rank_result
-    float *rank_result = (float *) calloc(config.m*config.m, sizeof(float));
-        if (!rank_result) {
-            log_fatal("[processor %d] Memory allocation failed for input with errno", rank);
-            MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-        }
+    //  and store the result in rank_syrk_result
+    float *rank_syrk_result = (float *) calloc((long) config.m * config.m, sizeof(float));
+    if (!rank_syrk_result) {
+        log_fatal("[processor %d] Memory allocation failed for input with errno", rank);
+        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    }
 
 
     // Synchronize before starting time
@@ -127,13 +147,13 @@ int main(int argc, char *argv[]) {
 
     switch (ALGO) {
         case 0:
-            syrkIterative(&config, rank, index_arr, rank_input, rank_input_t, rank_result);
+            syrkIterative(&config, rank, index_arr_rank, rank_input, rank_input_t, rank_syrk_result);
             break;
         case 1:
-            improved_syrkIterative(&config, rank, index_arr, rank_input, rank_input_t, rank_result);
+            improved_syrkIterative(&config, rank, index_arr_rank, rank_input, rank_input_t, rank_syrk_result);
             break;
         case 2:
-            syrk_withOpenBLAS(&config, rank, index_arr, rank_input, rank_result);
+            syrk_withOpenBLAS(&config, rank, index_arr_rank, rank_input, rank_syrk_result);
             break;
         default:
             log_fatal("no SYRK operator selected --> error ALOG %d not in [0..2]", ALGO);
@@ -142,8 +162,7 @@ int main(int argc, char *argv[]) {
     // Synchronize again before obtaining the time
     //MPI_Barrier(MPI_COMM_WORLD);
     log_info("Syrk algo(%d) took %f sec", ALGO, MPI_Wtime() - start);
-    free(index_arr);
-    log_debug("Successfully freed the buffer -> index_arr");
+    log_debug("Successfully freed the buffer -> cumulate_index_arr");
     free(rank_input);
     log_debug("Successfully freed the buffer -> rank_input");
     free(rank_input_t);
@@ -151,21 +170,31 @@ int main(int argc, char *argv[]) {
 
 
     int *counts = (int *) calloc(world_size, sizeof(int));
-    index_calculation(counts, config.m * config.m, world_size);
+    index_calculation(counts, (long) config.m * config.m, world_size);
 
     float *reduction_result = (float *) calloc(counts[rank], sizeof(float));
 
     double start_mpi_reduce_scatter = MPI_Wtime();
 
-    int result = MPI_Reduce_scatter(rank_result, reduction_result, counts, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+//    float *buffer = NULL;
+//    if (rank == 0) {
+//        buffer = (float *) calloc(config.m * config.m, sizeof(float));
+//    }
+    //int result = MPI_Reduce(rank_syrk_result, buffer, config.m * config.m, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+    int result = MPI_Reduce_scatter(rank_syrk_result, reduction_result, counts, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
     if (result != MPI_SUCCESS) {
         log_error("MPI_Reduce_scatter returned exit coed %d", result);
     }
 
     double runtime_mpi_reduce_scatter = MPI_Wtime() - start_mpi_reduce_scatter;
-    log_debug("[rank %d]: MPI_Reduce_scatter took %f sec", rank, runtime_mpi_reduce_scatter);
+    //log_debug("[rank %d]: MPI_Reduce_scatter took %f sec", rank, runtime_mpi_reduce_scatter);
+    log_debug("[rank %d]: MPI_Reduce took %f sec", rank, runtime_mpi_reduce_scatter);
 
     if (rank == 0) {
+        double runtime = MPI_Wtime() - start;
+        printf("The process took %f seconds to run.\n", runtime);
+
         log_debug("m = %d", config.m);
         log_debug("[int] config.m * config.m = %d", config.m * config.m);
         log_debug("[long] config.m * config.m = %ld", config.m * config.m);
@@ -199,11 +228,10 @@ int main(int argc, char *argv[]) {
         }
 
 
-        double runtime = MPI_Wtime() - start;
+
 
         //Print the result:
-        printf("Values gathered in the buffer on process %d:\n", rank);
-        printf("The process took %f seconds to run.\n", runtime);
+        log_info("Values gathered in the buffer on process %d\n", rank);
 
         if (PRINT_RESULT) {
             // No synchronization needed because only processor 0 operates here
@@ -230,10 +258,10 @@ int main(int argc, char *argv[]) {
     free(reduction_result);
     log_debug("Successfully freed the buffer -> reduction_result");
 
-    free(rank_result);
-    log_debug("Successfully freed the buffer -> rank_result");
+    free(rank_syrk_result);
+    log_debug("Successfully freed the buffer -> rank_syrk_result");
 
-    log_info("finish the program:");
+    log_info("[rank %d] finished the program --> MPI_Finalize()", rank);
     // finish the program:
     int status;
     if ((status = MPI_Finalize()) != MPI_SUCCESS) {
@@ -243,30 +271,29 @@ int main(int argc, char *argv[]) {
     return EXIT_SUCCESS;
 }
 
-void syrkIterative(run_config *s, int rank, int *index_arr, float **rank_input, float **rank_input_t,
+void syrkIterative(run_config *s, int rank, int index_arr_rank, float **rank_input, float **rank_input_t,
                    float *rank_result) {
-    log_debug("start syrkIterative:");
-    log_debug("index_arr[rank = %d] == %d", rank, index_arr[rank]);
+    log_trace("[rank %d] syrkIterative()", rank);
     // for each result row:
     for (long row = 0; row < s->m; ++row) {
         // for each result column
         for (long col = 0; col < s->m; ++col) {
             // run for slice of the input:
-            for (long c = 0; c < index_arr[rank]; ++c) {
+            for (long c = 0; c < index_arr_rank; ++c) {
                 rank_result[row * s->m + col] += rank_input[row][c] * rank_input_t[c][col];
             }
         }
     }
 }
 
-void improved_syrkIterative(run_config *s, int rank, const int *index_arr, float **rank_input, float **rank_input_t,
+void improved_syrkIterative(run_config *s, int rank, const int index_arr_rank, float **rank_input, float **rank_input_t,
                             float *rank_result) {
-
+    log_trace("[rank %d] improved_syrkIterative()", rank);
     for (int row = 0; row < s->m; ++row) {
         //log_debug("outer for loop : row = %d; run_config.m = %d", row, s->m);
         for (int col = row; col < s->m; ++col) {
             //log_debug("middle for loop : col = %d; run_config.n = %d", col, s->m);
-            for (int c = 0; c < index_arr[rank]; ++c) {
+            for (int c = 0; c < index_arr_rank; ++c) {
 
                 rank_result[row * s->m + col] += rank_input[row][c] * rank_input_t[c][col];
             }
@@ -274,15 +301,16 @@ void improved_syrkIterative(run_config *s, int rank, const int *index_arr, float
     }
 }
 
-void syrk_withOpenBLAS(run_config *config, int rank, int *index_arr, float **rank_input, float *rank_result) {
-    float *A = (float *) calloc(config->m * index_arr[rank], sizeof(float));
+void syrk_withOpenBLAS(run_config *config, int rank, int index_arr_rank, float **rank_input, float *rank_result) {
+    log_trace("[rank %d] syrk_withOpenBLAS()", rank);
+    float *A = (float *) calloc(config->m * index_arr_rank, sizeof(float));
     if (A == NULL) {
         log_error("Calloc failed");
         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
     for (int i = 0; i < config->m; ++i) {
-        for (int j = 0; j < index_arr[rank]; ++j) {
-            A[i * index_arr[rank] + j] = rank_input[i][j];
+        for (int j = 0; j < index_arr_rank; ++j) {
+            A[i * index_arr_rank + j] = rank_input[i][j];
         }
     }
     cblas_ssyrk(
@@ -290,27 +318,22 @@ void syrk_withOpenBLAS(run_config *config, int rank, int *index_arr, float **ran
             CblasUpper,
             CblasConjNoTrans,
             config->m,
-            (int) index_arr[rank],
+            index_arr_rank,
             1.0f,
             A,
-            (int) index_arr[rank],
+            index_arr_rank,
             0.0f,
             rank_result,
             config->m);
 }
 
-void computeInputAndTransposed(run_config *s, int rank, int *index_arr, float **input, float **rank_input,
+void computeInputAndTransposed(run_config *s, int rank, int index_arr_rank, int cum_index_arr_rank, float **input,
+                               float **rank_input,
                                float **rank_input_t) {
-    int rank_count = 0;
-    for (int i = 0; i < rank; ++i) {
-        rank_count += index_arr[i];
-        log_debug("rank = %d, rank_count = %d", rank, rank_count);
-    }
-    log_trace("index_arr[rank] = %d", index_arr[rank]);
-
+    log_trace("[rank %d] computeInputAndTransposed()", rank);
     for (int row = 0; row < s->m; row++) {
-        for (int col = 0; col < index_arr[rank]; ++col) {
-            float tmp = input[row][rank_count + col];
+        for (int col = 0; col < index_arr_rank; ++col) {
+            float tmp = input[row][cum_index_arr_rank + col];
             rank_input[row][col] = tmp;
             log_debug("&input[(rank_count) + row_count * s->n] = %p => %f", &tmp, tmp);
             log_debug("rank_input[row_count] = %p => %f", rank_input[row], *rank_input[row]);
@@ -318,7 +341,7 @@ void computeInputAndTransposed(run_config *s, int rank, int *index_arr, float **
     }
     log_debug("for loop success");
 
-    transposeMatrix(s->m, index_arr[rank], rank_input, rank_input_t);
+    transposeMatrix(s->m, index_arr_rank, rank_input, rank_input_t);
 }
 
 int read_input_file(const int rank, run_config *s, float **A) {
@@ -374,13 +397,13 @@ int read_input_file(const int rank, run_config *s, float **A) {
     return EXIT_SUCCESS;
 }
 
-void index_calculation(int *arr, long n, int world_size) {
-    long input_size = n / world_size;
+void index_calculation(int *arr, long n, int p) {
+    long input_size = n / p;
 
-    long rest = n % world_size;
+    long rest = n % p;
     log_trace("rest = %d", rest);
 
-    for (int i = 0; i < world_size; ++i) {
+    for (int i = 0; i < p; ++i) {
         arr[i] = (int) input_size;
         if (i < rest) {
             arr[i] += 1;
@@ -400,18 +423,18 @@ void printResult(run_config *s, int cols, float *array) {
 
     for (int i = 0; i < cols; ++i) {
         for (int j = 0; j < cols; ++j) {
-            log_debug("array[%d][%d] = %f", i, j, array[i*cols + j]);
+            log_debug("array[%d][%d] = %f", i, j, array[i * cols + j]);
             if (j == cols - 1) {
-                fprintf(file, "%0.0f", array[i*cols + j]);
+                fprintf(file, "%0.0f", array[i * cols + j]);
             } else {
-                fprintf(file, "%0.0f; ", array[i*cols + j]);
+                fprintf(file, "%0.0f; ", array[i * cols + j]);
             }
 
         }
         fprintf(file, "\n");
     }
 
-    log_info("Finished printResults()");
+    log_debug("Finished printResults()");
 }
 
 /**
