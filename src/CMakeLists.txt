@@ -1,4 +1,7 @@
-set(SOURCES main.c log.c)
+set(SOURCES main.c log.c
+        two_d_syrk.c
+        two_d_syrk.h
+        one_d_syrk.c)
 add_executable(MPI_SYRK_implementation ${SOURCES})
 
 

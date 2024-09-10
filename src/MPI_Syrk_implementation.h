@@ -5,9 +5,14 @@
 #ifndef MPI_SYRK_IMPLEMENTATION_MPI_SYRK_IMPLEMENTATION_H
 #define MPI_SYRK_IMPLEMENTATION_MPI_SYRK_IMPLEMENTATION_H
 
-int ALGO = 0;
+#include <assert.h>
+#include <mpi.h>
+#include <stdlib.h>
+#include <openblas/cblas.h>
+#include "log.h"
 
 typedef struct {
+    int world_size;
     int m;
     int n;
     int c;
@@ -49,6 +54,8 @@ void error_exit(int rank, char *name, const char *msg, ...);
 void parseInput(run_config *s, int argc, char **argv, int rank);
 
 void printResult(run_config *s, int cols, float* array);
+
+void printArray(int row, int cols, const float *array, FILE *file);
 
 void index_calculation(int *arr, long n, int p);
 
