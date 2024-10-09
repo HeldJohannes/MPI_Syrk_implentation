@@ -62,8 +62,6 @@ void readInputFile(int *input, int rank, char **argv);
 
 void computeInputAndTransposed(run_config *s, int rank, const int *index_arr, const float *input, float *rank_input, float *rank_input_t);
 
-void syrk_1D(run_config *s, const int rank, const int *index_arr, const float *rank_input, float *rank_result);
-
 void syrkIterative(run_config *s, int rank, const int *index_arr, const float* rank_input, const float* rank_input_t, float* rank_result);
 
 void transposeMatrix(int m, int n, float *matrix, float *result);
