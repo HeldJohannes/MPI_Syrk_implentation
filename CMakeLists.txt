@@ -27,7 +27,7 @@ set(CMAKE_C_COMPILER mpicc)
 set(CMAKE_CXX_COMPILER mpicc)
 
 
-#set(CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH};/opt/spack/spack_git_updated/opt/spack/linux-debian11-skylake_avx512/gcc-12.1.0/openblas-0.3.26-qp6eunppchtpxplzta3jd5komgb2nn6r")
+set(CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH};/opt/spack/spack_git_updated/opt/spack/linux-debian11-skylake_avx512/gcc-12.1.0/openblas-0.3.26-qp6eunppchtpxplzta3jd5komgb2nn6r")
 #message(CMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}")
 
 
@@ -37,15 +37,17 @@ set(CMAKE_CXX_COMPILER mpicc)
 #    set(CMAKE_PREFIX_PATH  "/opt/homebrew/Cellar/openblas/0.3.27/")
 #    include_directories("/opt/homebrew/Cellar/openblas/0.3.27/include/")
 #endif (APPLE)
-#find_package(BLAS)
+set(BLA_PREFER_PKGCONFIG TRUE)
+set(BLA_PKGCONFIG_BLAS openblas64)
+find_package(BLAS)
 
 
 #link openBlas
 
-#message("Found BLAS LIBARIES: " ${BLAS_FOUND})
-#if (BLAS_FOUND)
-#    message("Found the BLAS LIBARIE: " ${BLAS_LIBRARIES})
-#endif (BLAS_FOUND)
+message("Found BLAS LIBARIES: " ${BLAS_FOUND})
+if (BLAS_FOUND)
+    message("Found the BLAS LIBARIE: " ${BLAS_LIBRARIES})
+endif (BLAS_FOUND)
 
 #include_directories("/opt/homebrew/include/")
 

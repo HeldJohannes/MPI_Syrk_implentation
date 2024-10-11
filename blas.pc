@@ -1,0 +1,13 @@
+libdir=/opt/spack/spack_git_updated/opt/spack/linux-debian11-skylake_avx512/gcc-12.1.0/openblas-0.3.26-qp6eunppchtpxplzta3jd5komgb2nn6r/lib
+libsuffix=64_
+includedir=/opt/spack/spack_git_updated/opt/spack/linux-debian11-skylake_avx512/gcc-12.1.0/openblas-0.3.26-qp6eunppchtpxplzta3jd5komgb2nn6r/include
+openblas_config= USE_64BITINT=1 DYNAMIC_ARCH=1 DYNAMIC_OLDER= NO_CBLAS= NO_LAPACK= NO_LAPACKE= NO_AFFINITY=1 USE_OPENMP=0 SKYLAKEX MAX_THREADS=16
+version=0.3.26
+extralib=-lm -lgfortran -lm -lgfortran
+Name: openblas
+Description: OpenBLAS is an optimized BLAS library based on GotoBLAS2 1.13 BSD version
+Version: ${version}
+URL: https://github.com/xianyi/OpenBLAS
+Libs: -L${libdir} -lopenblas${libsuffix}
+Libs.private: ${extralib}
+Cflags: -I${includedir}                                                                                                                                              13,23         All
