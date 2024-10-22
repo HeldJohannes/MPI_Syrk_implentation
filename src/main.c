@@ -1,17 +1,8 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <stdarg.h>
-#include <mpi.h>
-#include <time.h>
-#include <float.h>
-#include "log.h"
-#include <cblas.h>
-#include <getopt.h>
 #include "MPI_Syrk_implementation.h"
 
 _Bool PRINT_RESULT = false;
+
+int generate_input(const int rank, run_config *s, float **A);
 
 /**
  *
@@ -26,6 +17,8 @@ int main(int argc, char *argv[]) {
     // setup:
     log_set_level(LOG_FATAL);
     static run_config config;
+    config.fileName = NULL;
+
     int world_size, rank;
 
     MPI_Init(&argc, &argv);
@@ -70,7 +63,15 @@ int main(int argc, char *argv[]) {
     // read the input matrix A
     // and compute the index_array
     if (rank == 0) {
-        read_input_file(rank, &config, input);
+
+        if (config.fileName != NULL) {
+            read_input_file(rank, &config, input);
+        } else {
+            generate_input(rank, &config, input);
+        }
+
+
+        
         // calculate how many cols each node gets
         index_calculation(index_arr, config.n, world_size);
 
@@ -272,62 +273,6 @@ int main(int argc, char *argv[]) {
     return EXIT_SUCCESS;
 }
 
-void syrkIterative(run_config *s, int rank, int index_arr_rank, float **rank_input, float **rank_input_t,
-                   float *rank_result) {
-    log_trace("[rank %d] syrkIterative()", rank);
-    // for each result row:
-    for (long row = 0; row < s->m; ++row) {
-        // for each result column
-        for (long col = 0; col < s->m; ++col) {
-            // run for slice of the input:
-            for (long c = 0; c < index_arr_rank; ++c) {
-                rank_result[row * s->m + col] += rank_input[row][c] * rank_input_t[c][col];
-            }
-        }
-    }
-}
-
-void improved_syrkIterative(run_config *s, int rank, const int index_arr_rank, float **rank_input, float **rank_input_t,
-                            float *rank_result) {
-    log_trace("[rank %d] improved_syrkIterative()", rank);
-    for (int row = 0; row < s->m; ++row) {
-        //log_debug("outer for loop : row = %d; run_config.m = %d", row, s->m);
-        for (int col = row; col < s->m; ++col) {
-            //log_debug("middle for loop : col = %d; run_config.n = %d", col, s->m);
-            for (int c = 0; c < index_arr_rank; ++c) {
-
-                rank_result[row * s->m + col] += rank_input[row][c] * rank_input_t[c][col];
-            }
-        }
-    }
-}
-
-void syrk_withOpenBLAS(run_config *config, int rank, int index_arr_rank, float **rank_input, float *rank_result) {
-    log_trace("[rank %d] syrk_withOpenBLAS()", rank);
-    float *A = (float *) calloc(config->m * index_arr_rank, sizeof(float));
-    if (A == NULL) {
-        log_error("Calloc failed");
-        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-    }
-    for (int i = 0; i < config->m; ++i) {
-        for (int j = 0; j < index_arr_rank; ++j) {
-            A[i * index_arr_rank + j] = rank_input[i][j];
-        }
-    }
-    cblas_ssyrk64_(
-            CblasRowMajor,
-            CblasUpper,
-            CblasConjNoTrans,
-            config->m,
-            index_arr_rank,
-            1.0f,
-            A,
-            index_arr_rank,
-            0.0f,
-            rank_result,
-            config->m);
-}
-
 void computeInputAndTransposed(run_config *s, int rank, int index_arr_rank, int cum_index_arr_rank, float **input,
                                float **rank_input,
                                float **rank_input_t) {
@@ -343,6 +288,17 @@ void computeInputAndTransposed(run_config *s, int rank, int index_arr_rank, int 
     log_debug("for loop success");
 
     transposeMatrix(s->m, index_arr_rank, rank_input, rank_input_t);
+}
+
+int generate_input(const int rank, run_config *s, float **A) {
+    srand((unsigned int) time(NULL));
+    for (size_t i = 0; i < s->m; i++)
+    {
+        for (size_t j = 0; j < s->n; j++)
+        {
+            A[i][j] = (float) (rand() % 10) + 1;
+        }
+    }
 }
 
 int read_input_file(const int rank, run_config *s, float **A) {
