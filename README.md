@@ -103,4 +103,47 @@ Rscript --vanilla ./resourec/GernateTestdata.R <dir_to_safe> <Number of Rows (m)
 ## Helpful Links
 
 - https://www.jetbrains.com/help/clion/openmpi.html
-- 
+- https://people.freedesktop.org/~dbn/pkg-config-guide.html
+- https://cmake.org/cmake/help/v3.18/module/FindBLAS.html
+- https://cmake.org/cmake/help/v3.18/command/find_package.html#search-modes
+
+
+## Helpful commads on server
+
+The module mpi has to be loaded every day with:
+```
+module load mpi/openmpiS
+```
+The loaded modeles can be checked with:
+```
+module list
+```
+To get the current directory path:
+```
+pwd
+```
+To add the `blas.pc`to the pkg-config path use the following command in the directory where the file is:
+```
+export PKG_CONFIG_PATH=$(pwd)
+```
+to check that the command worked use:
+```
+echo $PKG_CONFIG_PATH
+```
+to check that the pkg-config is found by the pkg-config command use:
+```
+pkg-config --modversion blas
+```
+to build the system on `HYDRA`:
+```
+mkdir build
+cd build/
+cmake .. -DHYDRA=True
+cmake --build .
+```
+
+to test that everything works as expected:
+```
+cd /home/thesis/jheld/MPI_Syrk_implementation
+mpiexec -np 1 ./build/src/MPI_SYRK_implementation -m 2 -n 3 -a 2 ./resource/input/test2x3.csv
+```

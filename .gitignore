@@ -53,6 +53,8 @@ dkms.conf
 
 # Ignored project specific folders
 /.idea/*
+.vscode/
+build/
 /cmake-build-debug/*
 /cmake-build-default/*
 result.csv

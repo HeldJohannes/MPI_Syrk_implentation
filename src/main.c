@@ -7,7 +7,8 @@
 #include <time.h>
 #include <float.h>
 #include "log.h"
-#include <openblas/cblas.h>
+#include <cblas.h>
+#include <getopt.h>
 #include "MPI_Syrk_implementation.h"
 
 _Bool PRINT_RESULT = false;
@@ -313,7 +314,7 @@ void syrk_withOpenBLAS(run_config *config, int rank, int index_arr_rank, float *
             A[i * index_arr_rank + j] = rank_input[i][j];
         }
     }
-    cblas_ssyrk(
+    cblas_ssyrk64_(
             CblasRowMajor,
             CblasUpper,
             CblasConjNoTrans,
