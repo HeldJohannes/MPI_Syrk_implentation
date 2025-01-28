@@ -102,10 +102,11 @@ Rscript --vanilla ./resourec/GernateTestdata.R <dir_to_safe> <Number of Rows (m)
 
 ## Helpful Links
 
-- https://www.jetbrains.com/help/clion/openmpi.html
-- https://people.freedesktop.org/~dbn/pkg-config-guide.html
-- https://cmake.org/cmake/help/v3.18/module/FindBLAS.html
-- https://cmake.org/cmake/help/v3.18/command/find_package.html#search-modes
+- [Open MPI](https://www.jetbrains.com/help/clion/openmpi.html)
+- [Pkg-Config](https://people.freedesktop.org/~dbn/pkg-config-guide.html)
+- [C Make FindBLAS](https://cmake.org/cmake/help/v3.18/module/FindBLAS.html)
+- [C Make find_package()](https://cmake.org/cmake/help/v3.18/command/find_package.html#search-modes)
+- [Slurm tutorial](https://www.uibk.ac.at/zid/systeme/hpc-systeme/common/tutorials/slurm-tutorial.html#HDR2_1_1)
 
 
 ## Helpful commads on server
