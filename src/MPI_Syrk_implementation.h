@@ -5,6 +5,18 @@
 #ifndef MPI_SYRK_IMPLEMENTATION_MPI_SYRK_IMPLEMENTATION_H
 #define MPI_SYRK_IMPLEMENTATION_MPI_SYRK_IMPLEMENTATION_H
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdarg.h>
+#include <mpi.h>
+#include <time.h>
+#include <float.h>
+#include "log.h"
+#include <cblas.h>
+#include <getopt.h>
+
 int ALGO = 0;
 
 typedef struct {
