@@ -1,8 +1,9 @@
 #include "MPI_Syrk_implementation.h"
+#include "one_d_syrk.c"
 
 _Bool PRINT_RESULT = false;
 
-int generate_input(const int rank, run_config *s, float **A);
+void generate_input(run_config *s, float **A);
 
 /**
  *
@@ -67,7 +68,7 @@ int main(int argc, char *argv[]) {
         if (config.fileName != NULL) {
             read_input_file(rank, &config, input);
         } else {
-            generate_input(rank, &config, input);
+           generate_input(&config, input);
         }
 
 
@@ -290,11 +291,11 @@ void computeInputAndTransposed(run_config *s, int rank, int index_arr_rank, int 
     transposeMatrix(s->m, index_arr_rank, rank_input, rank_input_t);
 }
 
-int generate_input(const int rank, run_config *s, float **A) {
+void generate_input(run_config *s, float **A) {
     srand((unsigned int) time(NULL));
-    for (size_t i = 0; i < s->m; i++)
+    for (int i = 0; i < s->m; i++)
     {
-        for (size_t j = 0; j < s->n; j++)
+        for (int j = 0; j < s->n; j++)
         {
             A[i][j] = (float) (rand() % 10) + 1;
         }
