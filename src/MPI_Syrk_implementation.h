@@ -8,7 +8,7 @@
 #include <assert.h>
 #include <mpi.h>
 #include <stdlib.h>
-#include <openblas/cblas.h>
+#include <cblas.h>
 #include "log.h"
 
 typedef struct {

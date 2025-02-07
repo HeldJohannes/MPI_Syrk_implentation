@@ -43,8 +43,9 @@ void syrk_withOpenBLAS(run_config *config, int rank, int index_arr_rank, float *
             A[i * index_arr_rank + j] = rank_input[i][j];
         }
     }
+    
     // compute syrk:
-    cblas_ssyrk(
+    cblas_ssyrk64_(
             CblasRowMajor,
             CblasUpper,
             CblasConjNoTrans,

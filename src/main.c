@@ -4,11 +4,15 @@
 #include <stdarg.h>
 #include <time.h>
 #include <float.h>
+#include "log.h"
 #include "MPI_Syrk_implementation.h"
+#include "one_d_syrk.c"
 #include "two_d_syrk.h"
 
 _Bool PRINT_RESULT = false;
 int ALGO = 0;
+
+void generate_input(run_config *s, float **A);
 
 /**
  *
@@ -23,6 +27,8 @@ int main(int argc, char *argv[]) {
     // setup:
     log_set_level(LOG_INFO);
     static run_config config;
+    config.fileName = NULL;
+
     int world_size, rank;
 
     MPI_Init(&argc, &argv);
@@ -70,7 +76,15 @@ int main(int argc, char *argv[]) {
     // read the input matrix A
     // and compute the index_array
     if (rank == 0) {
-        read_input_file(rank, &config, input);
+
+        if (config.fileName != NULL) {
+            read_input_file(rank, &config, input);
+        } else {
+           generate_input(&config, input);
+        }
+
+
+        
         // calculate how many cols each node gets
         index_calculation(index_arr, config.n, world_size);
 
@@ -388,6 +402,17 @@ void computeInputAndTransposed(run_config *s, int rank, int index_arr_rank, int 
     log_debug("for loop success");
 
     transposeMatrix(s->m, index_arr_rank, rank_input, rank_input_t);
+}
+
+void generate_input(run_config *s, float **A) {
+    srand((unsigned int) time(NULL));
+    for (int i = 0; i < s->m; i++)
+    {
+        for (int j = 0; j < s->n; j++)
+        {
+            A[i][j] = (float) (rand() % 10) + 1;
+        }
+    }
 }
 
 int read_input_file(const int rank, run_config *s, float **A) {
