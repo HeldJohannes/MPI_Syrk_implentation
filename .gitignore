@@ -58,3 +58,6 @@ dkms.conf
 result.csv
 results.csv
 syrk_result.csv
+
+/build
+/.vscode
