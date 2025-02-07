@@ -32,6 +32,7 @@ void improved_syrkIterative(run_config *s, int rank, const int index_arr_rank, f
 
 void syrk_withOpenBLAS(run_config *config, int rank, int index_arr_rank, float **rank_input, float *rank_result) {
     log_trace("[rank %d] syrk_withOpenBLAS()", rank);
+    // transform 2d array to 1d:
     float *A = (float *) calloc(config->m * index_arr_rank, sizeof(float));
     if (A == NULL) {
         log_error("Calloc failed");
@@ -42,6 +43,8 @@ void syrk_withOpenBLAS(run_config *config, int rank, int index_arr_rank, float *
             A[i * index_arr_rank + j] = rank_input[i][j];
         }
     }
+    
+    // compute syrk:
     cblas_ssyrk64_(
             CblasRowMajor,
             CblasUpper,

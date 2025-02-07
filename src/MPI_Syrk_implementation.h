@@ -5,21 +5,14 @@
 #ifndef MPI_SYRK_IMPLEMENTATION_MPI_SYRK_IMPLEMENTATION_H
 #define MPI_SYRK_IMPLEMENTATION_MPI_SYRK_IMPLEMENTATION_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <stdarg.h>
+#include <assert.h>
 #include <mpi.h>
-#include <time.h>
-#include <float.h>
-#include "log.h"
+#include <stdlib.h>
 #include <cblas.h>
-#include <getopt.h>
-
-int ALGO = 0;
+#include "log.h"
 
 typedef struct {
+    int world_size;
     int m;
     int n;
     int c;
@@ -61,6 +54,8 @@ void error_exit(int rank, char *name, const char *msg, ...);
 void parseInput(run_config *s, int argc, char **argv, int rank);
 
 void printResult(run_config *s, int cols, float* array);
+
+void printArray(int row, int cols, const float *array, FILE *file);
 
 void index_calculation(int *arr, long n, int p);
 

@@ -1,7 +1,16 @@
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdarg.h>
+#include <time.h>
+#include <float.h>
+#include "log.h"
 #include "MPI_Syrk_implementation.h"
 #include "one_d_syrk.c"
+#include "two_d_syrk.h"
 
 _Bool PRINT_RESULT = false;
+int ALGO = 0;
 
 void generate_input(run_config *s, float **A);
 
@@ -16,7 +25,7 @@ void generate_input(run_config *s, float **A);
 int main(int argc, char *argv[]) {
 
     // setup:
-    log_set_level(LOG_FATAL);
+    log_set_level(LOG_INFO);
     static run_config config;
     config.fileName = NULL;
 
@@ -29,6 +38,7 @@ int main(int argc, char *argv[]) {
 
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    config.world_size = world_size;
 
     if (argc <= 5) {
         error_exit(rank, argv[0], "To many or not enough input variables!");
@@ -39,14 +49,16 @@ int main(int argc, char *argv[]) {
 
     log_debug("Size = %d (SIZE_MAX = %zu) => %zu", config.m * config.n, SIZE_MAX, config.m * config.n * sizeof(float));
     //input_matrix_in_array_form
+    float *input_array = (float *) calloc(config.m * config.n, sizeof(float ));
+    if (input_array == NULL) {
+        log_fatal("Memory allocation failed for input");
+        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    }
     float **input = (float **) calloc(config.m, sizeof(float *));
     for (int i = 0; i < config.m; ++i) {
-        input[i] = (float *) calloc(config.n, sizeof(float));
-        if (input[i] == NULL) {
-            log_fatal("Memory allocation failed for input");
-            MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-        }
+        input[i] = &(input_array[config.n * i]);
     }
+
 
     int index_arr_rank;
     //int cumulate_index_arr_rank;
@@ -78,7 +90,9 @@ int main(int argc, char *argv[]) {
 
         int rank_count = 0;
         for (int i = 0; i < world_size; ++i) {
+            assert(cumulate_index_arr + i != NULL);
             cumulate_index_arr[i] = rank_count;
+            assert(index_arr + i != NULL);
             rank_count += index_arr[i];
         }
     }
@@ -89,18 +103,114 @@ int main(int argc, char *argv[]) {
     //MPI_Scatter(cumulate_index_arr, 1, MPI_INT, &cumulate_index_arr_rank, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
     //input matrix for each node:
-    float **rank_input = (float **) calloc(config.m, sizeof(float *));
-    for (int i = 0; i < config.m; ++i) {
-        rank_input[i] = (float *) calloc(index_arr_rank, sizeof(float));
-        if (!rank_input[i]) {
-            log_fatal("Memory allocation failed for rank_input[%d]", i);
+    float **rank_input;
+    if (ALGO != 3) {
+        rank_input = (float **) calloc(config.m, sizeof(float *));
+        for (int i = 0; i < config.m; ++i) {
+            rank_input[i] = (float *) calloc(index_arr_rank, sizeof(float));
+            if (!rank_input[i]) {
+                log_fatal("Memory allocation failed for rank_input[%d]", i);
+                MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+            }
+        }
+
+        for (int i = 0; i < config.m; ++i) {
+            // for each row split and distribute across all processors
+            MPI_Scatterv(input[i], index_arr, cumulate_index_arr, MPI_FLOAT, rank_input[i], index_arr_rank, MPI_FLOAT,
+                         0,
+                         MPI_COMM_WORLD);
+        }
+    } else {
+
+        //todo find a better solution:
+        MPI_Bcast(input_array, config.m * config.n, MPI_FLOAT, 0, MPI_COMM_WORLD);
+
+        /*
+         * Step 1:
+         *
+         * Create new Communicators Based on Q_i to take advantage of MPI_SCATTER to split A_i as A_i^(k).
+         * note: this step might not be necessary but I couldn't find a better current solution
+         */
+        MPI_Group main_group;
+        MPI_Comm_group(MPI_COMM_WORLD, &main_group);
+        // create the mpi - groups:
+        MPI_Group *pMpiGroups = (MPI_Group *) malloc(config.c * config.c * sizeof (MPI_Group ));
+        if (!pMpiGroups) {
+            log_fatal("Memory allocation failed for pMpiGroups", 0);
             MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
         }
-    }
+        // create mpi Communicators
+        MPI_Comm *pMpiCommunicators = (MPI_Comm *) malloc(config.c * config.c * sizeof (MPI_Comm ));
+        if (!pMpiCommunicators) {
+            log_fatal("Memory allocation failed for pMpiCommunicators", 0);
+            MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+        }
+        int *Q_i = (int *) calloc(config.c + 1, sizeof(int));
+        for (int i = 0; i < config.c * config.c; ++i) {
+            calculate_Q_i(Q_i, i, config.c);
+            int ret = MPI_Group_incl(main_group, config.c + 1, Q_i,&pMpiGroups[i]);
+            if (ret != MPI_SUCCESS) {
+                log_fatal("MPI_Group_incl failed for group %d", i);
+                MPI_Abort(MPI_COMM_WORLD, ret);
+            }
+            assert(pMpiGroups[i] != NULL);
+            int err = MPI_Comm_create(MPI_COMM_WORLD, pMpiGroups[i], &pMpiCommunicators[i]);
+            if (err != MPI_SUCCESS) {
+                log_error("MPI_Comm_create_group error");
+            }
+            assert(pMpiCommunicators[i] != NULL);
+        }
 
-    for (int i = 0; i < config.m; ++i) {
-        MPI_Scatterv(input[i], index_arr, cumulate_index_arr, MPI_FLOAT, rank_input[i], index_arr_rank, MPI_FLOAT, 0,
-                     MPI_COMM_WORLD);
+
+        /*
+         * Step 2:
+         *
+         * Spilt the input:
+         */
+
+        // Allocate the arrays:
+        // each node gets c blocks of A_i^(k)
+        int row_block_height = config.m / (config.c * config.c);
+        int row_block_length = (config.n / (config.c + 1));
+        //log_info("[rank = %d] row_block_length = %d", rank, row_block_length);
+        rank_input = (float **) calloc(config.c * row_block_height, sizeof (float *));
+        //int row_block_size = row_block_height * row_block_length;
+        for (int i = 0; i < config.c * row_block_height; ++i) {
+            rank_input[i] = (float *) calloc(row_block_length, sizeof (float ));
+            if (!rank_input[i]) {
+                log_fatal("Memory allocation failed for rank_input[%d]", i);
+                MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+            }
+        }
+
+        int *counts = (int *) calloc(config.c * config.c, sizeof(int ));
+
+        //config.world_size = config.c +1;
+
+
+        // Distribute the rows with MPI_Scatter:
+        for (int i = 0; i < config.c * config.c; ++i) {
+            calculate_Q_i(Q_i, i, config.c);
+            for (int j = 0; j < row_block_height; ++j) {
+                //int test_world_size = world_size;
+                assert(pMpiCommunicators[i] != NULL);
+                //MPI_Comm_size(pMpiCommunicators[i], &test_world_size);
+                //log_info("[rank = %d] world size = %d (row_block_height == %d)", rank, test_world_size, row_block_height);
+                if (pMpiCommunicators[i] != MPI_COMM_NULL) {
+                    MPI_Scatter(input[i * row_block_height + j], row_block_length, MPI_FLOAT, rank_input[((counts[rank]) * row_block_height) + j],
+                                row_block_length, MPI_FLOAT, Q_i[0], pMpiCommunicators[i]);
+                }
+            }
+            for (int j = 0; j < config.c +1; ++j) {
+                assert(Q_i[j] < config.world_size);
+                counts[Q_i[j]] += 1;
+            }
+        }
+
+        free(counts);
+        free(Q_i);
+        //print the rank_input:
+
     }
 
     // free index_arr and cumulate_index_arr because they are no longer needed
@@ -108,30 +218,28 @@ int main(int argc, char *argv[]) {
     free(cumulate_index_arr);
 
     // input no longer needed
-    for (int i = 0; i < config.m; ++i) {
-        free(input[i]);
-    }
-    free(input);
+    free(input_array);
     log_debug("Successfully freed the buffer -> input");
 
 
     //transposed input matrix for each node:
     float **rank_input_t = (float **) calloc(index_arr_rank, sizeof(float *));
-    for (int i = 0; i < index_arr_rank; ++i) {
-        rank_input_t[i] = (float *) calloc(config.m, sizeof(float));
-        if (!rank_input_t[i]) {
-            log_fatal("Memory allocation failed for input");
-            MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    if (ALGO != 3) {
+        for (int i = 0; i < index_arr_rank; ++i) {
+            rank_input_t[i] = (float *) calloc(config.m, sizeof(float));
+            if (!rank_input_t[i]) {
+                log_fatal("Memory allocation failed for input");
+                MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+            }
         }
+
+
+        // compute the input matrix, and it's transpose,
+        // which consists of the columns and all rows in that column:
+        //computeInputAndTransposed(&config, rank, index_arr_rank, cumulate_index_arr_rank, input, rank_input, rank_input_t);
+
+        transposeMatrix(config.m, index_arr_rank, rank_input, rank_input_t);
     }
-
-
-    // compute the input matrix, and it's transpose,
-    // which consists of the columns and all rows in that column:
-    //computeInputAndTransposed(&config, rank, index_arr_rank, cumulate_index_arr_rank, input, rank_input, rank_input_t);
-
-    transposeMatrix(config.m, index_arr_rank, rank_input, rank_input_t);
-
 
     // SYRK:
     // Compute the result matrix for each node which gets
@@ -158,13 +266,16 @@ int main(int argc, char *argv[]) {
         case 2:
             syrk_withOpenBLAS(&config, rank, index_arr_rank, rank_input, rank_syrk_result);
             break;
+        case 3:
+            two_d_syrk(&config, rank, rank_syrk_result, rank_input);
+            break;
         default:
             log_fatal("no SYRK operator selected --> error ALOG %d not in [0..2]", ALGO);
             error_exit(rank, argv[0], "no SYRK operator selected");
     }
     // Synchronize again before obtaining the time
     //MPI_Barrier(MPI_COMM_WORLD);
-    log_info("Syrk algo(%d) took %f sec", ALGO, MPI_Wtime() - start);
+    //log_info("Syrk algo(%d) took %f sec", ALGO, MPI_Wtime() - start);
     log_debug("Successfully freed the buffer -> cumulate_index_arr");
     free(rank_input);
     log_debug("Successfully freed the buffer -> rank_input");
@@ -274,6 +385,8 @@ int main(int argc, char *argv[]) {
     return EXIT_SUCCESS;
 }
 
+
+
 void computeInputAndTransposed(run_config *s, int rank, int index_arr_rank, int cum_index_arr_rank, float **input,
                                float **rank_input,
                                float **rank_input_t) {
@@ -362,10 +475,26 @@ void index_calculation(int *arr, long n, int p) {
     log_trace("rest = %d", rest);
 
     for (int i = 0; i < p; ++i) {
+        assert(arr + i != NULL);
         arr[i] = (int) input_size;
         if (i < rest) {
             arr[i] += 1;
         }
+    }
+}
+
+void printArray(int row, int cols, const float *array, FILE *file) {
+    for (int i = 0; i < row; ++i) {
+        for (int j = 0; j < cols; ++j) {
+            log_debug("array[%d][%d] = %f", i, j, array[i * cols + j]);
+            if (j == cols - 1) {
+                fprintf(file, "%0.0f", array[i * cols + j]);
+            } else {
+                fprintf(file, "%0.0f; ", array[i * cols + j]);
+            }
+
+        }
+        fprintf(file, "\n");
     }
 }
 
@@ -379,18 +508,7 @@ void printResult(run_config *s, int cols, float *array) {
         file = fopen("syrk_result.csv", "w");
     }
 
-    for (int i = 0; i < cols; ++i) {
-        for (int j = 0; j < cols; ++j) {
-            log_debug("array[%d][%d] = %f", i, j, array[i * cols + j]);
-            if (j == cols - 1) {
-                fprintf(file, "%0.0f", array[i * cols + j]);
-            } else {
-                fprintf(file, "%0.0f; ", array[i * cols + j]);
-            }
-
-        }
-        fprintf(file, "\n");
-    }
+    printArray(cols, cols, array, file);
 
     log_debug("Finished printResults()");
 }
@@ -414,7 +532,7 @@ void parseInput(run_config *s, int argc, char **argv, int rank) {
 
     int opt;
     char *end;
-    while ((opt = getopt(argc, argv, "a:m:n:o:")) != -1) {
+    while ((opt = getopt(argc, argv, "a:m:n:o:c:")) != -1) {
         switch (opt) {
             case 'a':
                 ALGO = (int) strtol(optarg, &end, 10);
@@ -427,6 +545,9 @@ void parseInput(run_config *s, int argc, char **argv, int rank) {
                 break;
             case 'o':
                 s->result_File = optarg;
+                break;
+            case 'c':
+                s->c = (int) strtol(optarg, &end, 10);
                 break;
             default:
             case '?':
@@ -469,8 +590,9 @@ void error_exit(int rank, char *name, const char *msg, ...) {
 void transposeMatrix(long m, long n, float **matrix, float **result) {
     for (long i = 0; i < m; i++) {
         for (long j = 0; j < n; j++) {
-            float value = matrix[i][j];
-            result[j][i] = value;
+            assert(matrix[i] + j != NULL);
+            assert(result[j] + i != NULL);
+            result[j][i] = matrix[i][j];
         }
     }
 }
