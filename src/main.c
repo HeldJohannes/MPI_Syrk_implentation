@@ -6,7 +6,7 @@
 #include <float.h>
 #include "log.h"
 #include "MPI_Syrk_implementation.h"
-#include "one_d_syrk.c"
+#include "one_d_syrk.h"
 #include "two_d_syrk.h"
 
 _Bool PRINT_RESULT = false;

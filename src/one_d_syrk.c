@@ -1,4 +1,4 @@
-#include "MPI_Syrk_implementation.h"
+#include "one_d_syrk.h"
 
 void syrkIterative(run_config *s, int rank, int index_arr_rank, float **rank_input, float **rank_input_t,
                    float *rank_result) {
