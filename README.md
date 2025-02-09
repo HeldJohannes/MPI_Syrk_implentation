@@ -143,6 +143,17 @@ cmake .. -DHYDRA=True
 cmake --build .
 ```
 
+## alternativ:
+
+build the config files 
+```
+cmake -S . -B build -DHYDRA
+```
+build the code
+```
+cmake --build build
+```
+
 to test that everything works as expected:
 ```
 cd /home/thesis/jheld/MPI_Syrk_implementation

@@ -326,7 +326,7 @@ void two_d_syrk(run_config *s, int k, float *rank_result, float **input) {
                 }
                 //C_ij =Local-GEMM(A,A_j^T)
                 //gemm((const double *) &A[i * block_size], (const double *) &A[j * block_size], block_height, block_length, result);
-                cblas_dgemm(
+                cblas_dgemm64_(
                         CblasRowMajor,
                         CblasNoTrans,
                         CblasNoTrans,
@@ -382,7 +382,7 @@ void two_d_syrk(run_config *s, int k, float *rank_result, float **input) {
                 //log_info("[rank == %d] i == %d", k, i);
                 copy_to_f(A_i_D_k, A, s->c, block_height, block_length, i, false);
                 //C_ii = Local-SYRK(A_i)
-                cblas_ssyrk(CblasRowMajor,CblasLower,CblasConjNoTrans,
+                cblas_ssyrk64_(CblasRowMajor,CblasLower,CblasConjNoTrans,
                             block_height,s->n,
                             1.0f,A_i_D_k,s->n,
                             0.0f,result_D_k,block_height);

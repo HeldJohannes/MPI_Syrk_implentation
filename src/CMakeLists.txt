@@ -1,3 +1,6 @@
+set(CMAKE_C_COMPILER mpicc)
+set(CMAKE_CXX_COMPILER mpicc)
+
 set(SOURCES main.c log.c
         two_d_syrk.c
         two_d_syrk.h
