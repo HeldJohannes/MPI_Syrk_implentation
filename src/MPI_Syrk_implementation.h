@@ -5,6 +5,10 @@
 #ifndef MPI_SYRK_IMPLEMENTATION_MPI_SYRK_IMPLEMENTATION_H
 #define MPI_SYRK_IMPLEMENTATION_MPI_SYRK_IMPLEMENTATION_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <assert.h>
 #include <mpi.h>
 #include <stdlib.h>
@@ -12,6 +16,7 @@
 #include "log.h"
 
 typedef struct {
+    int algo;
     int world_size;
     int m;
     int n;
@@ -63,6 +68,28 @@ void readInputFile(int *input, int rank, char **argv);
 
 void computeInputAndTransposed(run_config *s, int rank, int index_arr_rank, int cum_index_arr_rank, float **input, float **rank_input, float **rank_input_t);
 
+/**
+ * Transposes a matrix.
+ * @param m Number of rows in the matrix
+ * @param n Number of columns in the matrix
+ * @param matrix The matrix to be transposed
+ * @param result The transposed matrix
+ */
 void transposeMatrix(long m, long n, float** matrix, float** result);
+
+void generate_input(run_config *s, float **A);
+
+/**
+ * Prints usage information for the program.
+ *
+ * @param prog_name Name of the program
+ */
+void print_usage(char *prog_name);
+
+void error_exit(int rank, char *name, const char *msg, ...);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //MPI_SYRK_IMPLEMENTATION_MPI_SYRK_IMPLEMENTATION_H

@@ -1,9 +1,13 @@
 cmake_minimum_required(VERSION 3.18)
 
+# Enable testing framework
+enable_testing()
 
-# GoogleTest requires at least C++14
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(SOURCES 
+    test.cpp
+)
+
+# Fetch GoogleTest via CMake FetchContent
 include(FetchContent)
 FetchContent_Declare(
   googletest
@@ -11,18 +15,18 @@ FetchContent_Declare(
   GIT_TAG        v1.16.0
 )
 FetchContent_GetProperties(googletest)
+
 if(NOT googletest_POPULATED)
   FetchContent_Populate(googletest)
   add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR})
 endif()
 
-enable_testing()
+# Create test executable
+add_executable(MPI_SYRK_test ${SOURCES})
 
-add_executable(
-  MPI_SYRK_test 
-  test.cpp
-)
-target_link_libraries(
-  MPI_SYRK_test 
-  GTest::gtest_main
-)
+# Link against GoogleTest
+target_link_libraries(MPI_SYRK_test PRIVATE MPI_SYRK_lib GTest::gmock GTest::gtest_main)
+
+# Auto-discover tests
+include(GoogleTest)
+gtest_discover_tests(MPI_SYRK_test)

@@ -18,10 +18,15 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/CMakeModules)
 include(MPIConfig)
 include(BLASConfig)
 
+# Enforce C++14 standard
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 # Quellcode-Verzeichnis einbinden
 include_directories(src)
 add_subdirectory(src)
 
 if (PACKAGE_TESTS)
+    link_directories(src)
     add_subdirectory(test)
 endif()
