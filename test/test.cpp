@@ -1,73 +1,97 @@
 #include <gtest/gtest.h>
-#include <gtest/gtest-matchers.h>
-#include <gmock/gmock-matchers.h>
+#include <gmock/gmock.h>
 #include <vector>
 #include "MPI_Syrk_implementation.h"
 
 using ::testing::ElementsAreArray;
 
-class DateConverterFixture : public ::testing::Test {
-
+class TransposeMatrixTest : public ::testing::Test {
 protected:
+    int m, n;
+    std::vector<std::vector<float>> arr_input;
+    std::vector<std::vector<float>> result;
 
-    int m = 2;
-    int n = 2;
+    virtual void SetUp() override {}
 
-    float** arr_input;
-    float** result;
+    virtual void TearDown() override {}
 
+    void initializeMatrix(int rows, int cols) {
+        m = rows;
+        n = cols;
+        arr_input.assign(m, std::vector<float>(n));
+        result.assign(n, std::vector<float>(m));
 
-    virtual void SetUp(){
-
-        // Allocate memory for float**
-        arr_input = new float*[m];
-        result = new float*[n];
-
-        for (int i = 0; i < m; ++i) {
-            arr_input[i] = new float[n];
-        }
-        for (int i = 0; i < n; ++i) {
-            result[i] = new float[m];  // Transposed matrix will be n x m
-        }
-
-        // Fill arr_input with test data
         int counter = 1;
-        for (int i = 0; i < m; ++i) {
-            for (int j = 0; j < n; ++j) {
+        for (int i = 0; i < m; ++i)
+            for (int j = 0; j < n; ++j)
                 arr_input[i][j] = static_cast<float>(counter++);
-            }
-        }
     }
 
-    virtual void TearDown() {
-
+    std::vector<float> flattenMatrix(const std::vector<std::vector<float>>& matrix) {
+        std::vector<float> flat;
+        for (const auto& row : matrix)
+            flat.insert(flat.end(), row.begin(), row.end());
+        return flat;
     }
 
+    float** convertToPointerArray(std::vector<std::vector<float>>& matrix) {
+        float** ptr = new float*[matrix.size()];
+        for (size_t i = 0; i < matrix.size(); ++i)
+            ptr[i] = matrix[i].data();
+        return ptr;
+    }
 
+    void freePointerArray(float** ptr) {
+        delete[] ptr;
+    }
 };
 
-TEST_F(DateConverterFixture, transposeMatrix_should_work) {
-
-    transposeMatrix(m, n, arr_input, result);
+TEST_F(TransposeMatrixTest, SquareMatrix_ShouldWork) {
+    initializeMatrix(2, 2);
     
-    // Flatten `result` matrix into a 1D vector for comparison
-    std::vector<float> result_flat;
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < m; ++j) {
-            result_flat.push_back(result[i][j]);
-        }
-    }
+    float** inputPtr = convertToPointerArray(arr_input);
+    float** resultPtr = convertToPointerArray(result);
 
-    // Expected transposed matrix
+    transposeMatrix(m, n, inputPtr, resultPtr);
+
     std::vector<float> expected = {1, 3, 2, 4};
+    EXPECT_THAT(flattenMatrix(result), ElementsAreArray(expected));
 
-    EXPECT_THAT(result_flat, ElementsAreArray(expected));
+    freePointerArray(inputPtr);
+    freePointerArray(resultPtr);
 }
 
-// Test if the gtest framwork is correctly integrated with some basic assertions.
+TEST_F(TransposeMatrixTest, ThinMatrix_ShouldWork) {
+    initializeMatrix(4, 2);
+    
+    float** inputPtr = convertToPointerArray(arr_input);
+    float** resultPtr = convertToPointerArray(result);
+
+    transposeMatrix(m, n, inputPtr, resultPtr);
+
+    std::vector<float> expected = {1, 3, 5, 7, 2, 4, 6, 8};
+    EXPECT_THAT(flattenMatrix(result), ElementsAreArray(expected));
+
+    freePointerArray(inputPtr);
+    freePointerArray(resultPtr);
+}
+
+TEST_F(TransposeMatrixTest, FatMatrix_ShouldWork) {
+    initializeMatrix(2, 4);
+    
+    float** inputPtr = convertToPointerArray(arr_input);
+    float** resultPtr = convertToPointerArray(result);
+
+    transposeMatrix(m, n, inputPtr, resultPtr);
+
+    std::vector<float> expected = {1, 5, 2, 6, 3, 7, 4, 8};
+    EXPECT_THAT(flattenMatrix(result), ElementsAreArray(expected));
+
+    freePointerArray(inputPtr);
+    freePointerArray(resultPtr);
+}
+
 TEST(HelloTest, BasicAssertions) {
-    // Expect two strings not to be equal.
     EXPECT_STRNE("hello", "world");
-    // Expect equality.
     EXPECT_EQ(7 * 6, 42);
-  }
+}
