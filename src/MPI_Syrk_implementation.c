@@ -182,12 +182,15 @@ void transposeMatrix(long m, long n, float **matrix, float **result) {
 }
 
 void generate_input(run_config *s, float **A) {
-    srand((unsigned int) time(NULL));
-    for (int i = 0; i < s->m; i++)
-    {
-        for (int j = 0; j < s->n; j++)
-        {
-            A[i][j] = (float) (rand() % 10) + 1;
+    static int seeded = 0;
+    if (!seeded) {
+        srandom((unsigned int) time(NULL));
+        seeded = 1;
+    }
+
+    for (int i = 0; i < s->m; i++) {
+        for (int j = 0; j < s->n; j++) {
+            A[i][j] = ((float) random() / RAND_MAX) * 10.0;
         }
     }
 }
