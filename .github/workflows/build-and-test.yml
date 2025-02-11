@@ -8,7 +8,7 @@ on:
 
 env:
   BUILD_TYPE: Release
-  MPI_PROCESSES: 4  # Adjust the number of MPI processes as needed
+  MPI_PROCESSES: 4  # Adjust as needed for parallel execution
 
 jobs:
   build:
@@ -18,18 +18,29 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Install dependencies (CMake, OpenMPI, OpenBLAS)
+    - name: Install dependencies (CMake, OpenMPI, OpenBLAS, GoogleTest)
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake build-essential openmpi-bin libopenmpi-dev libopenblas-dev
+        sudo apt-get install -y cmake build-essential \
+            openmpi-bin libopenmpi-dev \
+            libopenblas-dev \
+            libgtest-dev
+        
+        # GoogleTest requires a manual build and install
+        cd /usr/src/gtest
+        sudo cmake .
+        sudo make
+        sudo mv lib/*.a /usr/lib
 
     - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBLAS_LIBRARIES=/usr/lib/x86_64-linux-gnu/libopenblas.so
+      run: cmake -B ${{github.workspace}}/build \
+          -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+          -DBLAS_LIBRARIES=/usr/lib/x86_64-linux-gnu/libopenblas.so
 
     - name: Build
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
 
-    - name: Run Tests with OpenMPI
+    - name: Run Tests with OpenMPI and GTest
       working-directory: ${{github.workspace}}/build/test
       run: |
         set -e  # Exit on first failure
