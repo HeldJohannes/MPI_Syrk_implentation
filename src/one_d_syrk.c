@@ -1,4 +1,10 @@
-#include "MPI_Syrk_implementation.h"
+#include "one_d_syrk.h"
+
+#ifdef USE_CBLAS_64
+    #define CBLAS_SYRK cblas_ssyrk64_
+#else
+    #define CBLAS_SYRK cblas_ssyrk
+#endif
 
 void syrkIterative(run_config *s, int rank, int index_arr_rank, float **rank_input, float **rank_input_t,
                    float *rank_result) {
@@ -45,7 +51,7 @@ void syrk_withOpenBLAS(run_config *config, int rank, int index_arr_rank, float *
     }
     
     // compute syrk:
-    cblas_ssyrk(
+    CBLAS_SYRK(
             CblasRowMajor,
             CblasUpper,
             CblasConjNoTrans,

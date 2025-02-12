@@ -10,6 +10,7 @@ enable_testing()
 
 set(SOURCES 
     test.cpp
+    test_parseInput.cpp
 )
 
 # Fetch GoogleTest via CMake FetchContent
@@ -20,10 +21,10 @@ FetchContent_Declare(
 )
 FetchContent_GetProperties(googletest)
 
-if(NOT googletest_POPULATED)
-  FetchContent_Populate(googletest)
-  add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR})
-endif()
+# Method to fetch and set up GoogleTest
+FetchContent_MakeAvailable(googletest)
+
+add_definitions(-DOMPI_SKIP_MPICXX)
 
 # Create test executable
 add_executable(MPI_SYRK_test ${SOURCES})
