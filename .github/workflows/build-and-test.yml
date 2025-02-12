@@ -17,6 +17,19 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
+    - name: Install dependencies (CMake, OpenMPI, GoogleTest)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential \
+            openmpi-bin libopenmpi-dev \
+            libgtest-dev
+        
+        # GoogleTest requires a manual build and install
+        cd /usr/src/gtest
+        sudo cmake .
+        sudo make
+        sudo mv lib/*.a /usr/lib
+
     - name: Install Spack
       run: |
         git clone --depth=1 https://github.com/spack/spack.git $HOME/spack
@@ -27,19 +40,13 @@ jobs:
     - name: Install Dependencies with Spack
       run: |
         source $HOME/spack/share/spack/setup-env.sh
-        spack install openmpi
-        spack install openblas
-        spack install googletest
-        spack load openmpi
+        spack install openblas@0.3.26
         spack load openblas
-        spack load googletest
 
     - name: Configure CMake
       run: |
         source $HOME/spack/share/spack/setup-env.sh
-        spack load openmpi
         spack load openblas
-        spack load googletest
         cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
 
     - name: Build
@@ -49,7 +56,5 @@ jobs:
       working-directory: ${{github.workspace}}/build/test
       run: |
         source $HOME/spack/share/spack/setup-env.sh
-        spack load openmpi
         spack load openblas
-        spack load googletest
         ctest -C ${{env.BUILD_TYPE}}
