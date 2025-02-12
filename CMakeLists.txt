@@ -5,7 +5,7 @@
 
 cmake_minimum_required(VERSION 3.18)
 
-option(HYDRA "Working on HYDRA" ON)
+option(HYDRA "Working on HYDRA" OFF)
 option(PACKAGE_TESTS "Build the tests" ON)
 
 project(MPI_SYRK_implementation

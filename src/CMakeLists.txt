@@ -21,6 +21,10 @@ target_link_libraries(MPI_SYRK_lib PUBLIC MPI::MPI_CXX BLAS::BLAS)
 # Add executable
 add_executable(MPI_SYRK_implementation main.c)
 
+if(HYDRA)
+    add_compile_definitions(USE_CBLAS_64)
+endif()
+
 
 # Add libraries for code completion and compiling
 target_link_libraries(MPI_SYRK_implementation PUBLIC MPI_SYRK_lib MPI::MPI_CXX BLAS::BLAS)
