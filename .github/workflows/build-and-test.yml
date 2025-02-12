@@ -63,20 +63,19 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Install OpenMPI for Testing
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y openmpi-bin libopenmpi-dev
-
     - name: Download Build Artifacts
       uses: actions/download-artifact@v4
       with:
         name: built-project
         path: ${{ github.workspace }}/build
 
-    - name: Run Tests with OpenMPI and GTest
+    - name: Set Execute Permissions for Test Binaries
+      run: chmod +x ${{ github.workspace }}/build/test/MPI_SYRK_test
+
+    - name: Run Tests with GTest
       working-directory: ${{github.workspace}}/build/test
       run: |
         set -e  # Exit on first failure
+        # Run tests
         # mpiexec -np ${{env.MPI_PROCESSES}} ctest -C ${{env.BUILD_TYPE}}
         ctest -C ${{env.BUILD_TYPE}}
