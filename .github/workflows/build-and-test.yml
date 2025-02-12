@@ -42,6 +42,11 @@ jobs:
       run: |
         source ~/spack/share/spack/setup-env.sh
         spack load openblas
+
+        # Ensure CMake finds OpenBLAS headers and libraries
+        export CMAKE_INCLUDE_PATH=$OPENBLAS_ROOT/include:$CMAKE_INCLUDE_PATH
+        export CMAKE_LIBRARY_PATH=$OPENBLAS_ROOT/lib:$CMAKE_LIBRARY_PATH
+
         cmake -B ${{github.workspace}}/build \
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
           -DOpenBLAS_DIR=$OPENBLAS_ROOT
