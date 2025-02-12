@@ -10,10 +10,10 @@ enable_testing()
 
 set(SOURCES 
     test.cpp
+    test_parseInput.cpp
 )
 
 # Fetch GoogleTest via CMake FetchContent
-include(FetchContent)
 FetchContent_Declare(
   googletest
   GIT_REPOSITORY https://github.com/google/googletest.git

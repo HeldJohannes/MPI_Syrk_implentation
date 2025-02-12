@@ -202,3 +202,4 @@ class GenerateInputTest : public ::testing::Test {
         // Check that the average deviation is high enough to indicate randomness
         EXPECT_GT(averageDeviation, 2.0) << "Randomness is too low.";
     }
+

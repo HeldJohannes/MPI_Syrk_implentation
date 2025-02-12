@@ -18,6 +18,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/CMakeModules)
 include(MPIConfig)
 include(BLASConfig)
 
+include(FetchContent)
+
 # Enforce C++14 standard
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

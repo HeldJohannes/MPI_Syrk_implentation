@@ -147,7 +147,7 @@ cmake --build .
 
 build the config files 
 ```
-cmake -S . -B build -DHYDRA
+cmake -S . -B build -DHYDRA=ON
 ```
 build the code
 ```

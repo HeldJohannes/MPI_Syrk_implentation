@@ -36,21 +36,36 @@ void parseInput(run_config *s, int argc, char **argv, int rank) {
                 break;
             default:
             case '?':
-                print_usage(argv[0]);
-                if (optopt == '?') {
-                    exit(0);
-                }
-                error_exit(rank, argv[0], "wrong usage: option %c doesn't exist", opt);
+                fprintf(stderr, "wrong usage: option %c doesn't exist", optopt);
+                //print_usage(argv[0]);
+                exit(EXIT_FAILURE); 
         }
     }
 
     log_trace("m = %d; n = %d", s->m, s->n);
-    if (s->m == -1 || s->n == -1) {
-        error_exit(rank, argv[0], "parameters m (= %d) and n (= %d) have to be bigger than 0", s->m, s->n);
+
+    if (s->m == -1)
+    {
+        fprintf(stderr, "missing parameter m\n");
+        exit(EXIT_FAILURE);
+    }
+    if (s->n == -1)
+    {
+        fprintf(stderr, "missing parameter n\n");
+        exit(EXIT_FAILURE);
+    }
+    if (s->m <= -1 || s->n <= -1) {
+        fprintf(stderr, "parameters m (= %d) and n (= %d) have to be bigger than 0\n", s->m, s->n);
+        exit(EXIT_FAILURE);
     }
 
     log_trace("optind = %d, argc = %d", optind, argc);
-    s->fileName = argv[optind];
+    if (optind < argc) {
+        s->fileName = argv[optind];
+    } else {
+        fprintf(stderr, "missing input file name\n");
+        exit(EXIT_FAILURE);
+    }
     log_trace("Exit parseInput");
 }
 
@@ -196,7 +211,7 @@ void generate_input(run_config *s, float **A) {
 }
 
 void print_usage(char *prog_name) {
-    fprintf(stderr, "Usage: \"mpiexec -np <CORES> %s -o <output_file> -m <ROWS> -n <COLS> <input_file> \"", prog_name);
+    fprintf(stderr, "Usage: \"mpiexec -np <CORES> %s -o <output_file> -m <ROWS> -n <COLS> <input_file> \"\n", prog_name);
 }
 
 void error_exit(int rank, char *name, const char *msg, ...) {
