@@ -35,7 +35,8 @@ jobs:
     - name: Configure CMake
       run: cmake -B ${{github.workspace}}/build \
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
-          -DBLAS_LIBRARIES=/usr/lib/x86_64-linux-gnu/libopenblas64.so
+          -DBLAS_LIBRARIES=/usr/lib/x86_64-linux-gnu/libopenblas64.so \
+          -DBLAS_INCLUDE_DIR=/usr/include
 
     - name: Build
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
