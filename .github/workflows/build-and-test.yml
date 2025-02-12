@@ -1,4 +1,4 @@
-name: CMake Build with OpenMPI, OpenBLAS (Spack), and GTest
+name: CMake with OpenMPI, GTest and OpenBlas
 
 on:
   push:
@@ -8,55 +8,43 @@ on:
 
 env:
   BUILD_TYPE: Release
+  MPI_PROCESSES: 4  # Adjust as needed for parallel execution
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Repository
+    - name: Checkout repository
       uses: actions/checkout@v4
 
-    # Install dependencies via APT
-    - name: Install OpenMPI and GTest
+    - name: Install dependencies (CMake, OpenMPI, OpenBLAS, GoogleTest)
       run: |
-        sudo apt update
-        sudo apt install -y openmpi-bin libopenmpi-dev libgtest-dev cmake make gcc g++
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential \
+            openmpi-bin libopenmpi-dev \
+            libopenblas-dev \
+            libgtest-dev
 
-    # Setup Spack
-    - name: Install Spack
-      run: |
-        git clone --depth=1 https://github.com/spack/spack.git ~/spack
-        echo 'source ~/spack/share/spack/setup-env.sh' >> ~/.bashrc
-        source ~/spack/share/spack/setup-env.sh
+        # Set OpenBLAS as the default BLAS through the `update-alternatives` mechanism:
+        sudo update-alternatives --config libblas.so.3
+        
+        # GoogleTest requires a manual build and install
+        cd /usr/src/gtest
+        sudo cmake .
+        sudo make
+        sudo mv lib/*.a /usr/lib
 
-    # Install OpenBLAS using Spack
-    - name: Install OpenBLAS with Spack
-      run: |
-        source ~/spack/share/spack/setup-env.sh
-        spack install openblas
-        echo "OPENBLAS_ROOT=$(spack location -i openblas)" >> $GITHUB_ENV
-
-    # Configure CMake with OpenBLAS
     - name: Configure CMake
-      run: |
-        source ~/spack/share/spack/setup-env.sh
-        spack load openblas
-
-        # Ensure CMake finds OpenBLAS headers and libraries
-        export CMAKE_INCLUDE_PATH=$OPENBLAS_ROOT/include:$CMAKE_INCLUDE_PATH
-        export CMAKE_LIBRARY_PATH=$OPENBLAS_ROOT/lib:$CMAKE_LIBRARY_PATH
-
-        cmake -B ${{github.workspace}}/build \
+      run: cmake -B ${{github.workspace}}/build \
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
-          -DOpenBLAS_DIR=$OPENBLAS_ROOT
+          -DBLAS_LIBRARIES=/usr/lib/x86_64-linux-gnu/libopenblas.so
 
-    # Build the project
     - name: Build
-      run: |
-        cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
 
-    # Run tests
-    - name: Test
-      working-directory: ${{github.workspace}}/build
-      run: ctest -C ${{env.BUILD_TYPE}}
+    - name: Run Tests with OpenMPI and GTest
+      working-directory: ${{github.workspace}}/build/test
+      run: |
+        set -e  # Exit on first failure
+        mpiexec -np ${{env.MPI_PROCESSES}} ctest -C ${{env.BUILD_TYPE}}
