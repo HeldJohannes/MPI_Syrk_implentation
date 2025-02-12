@@ -38,5 +38,5 @@ jobs:
       working-directory: ${{github.workspace}}/build
       run: |
         set -e  # Exit on first failure
-        cd test
+        ls
         mpiexec -np ${{env.MPI_PROCESSES}} ctest -C ${{env.BUILD_TYPE}}
