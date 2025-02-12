@@ -45,7 +45,7 @@ void syrk_withOpenBLAS(run_config *config, int rank, int index_arr_rank, float *
     }
     
     // compute syrk:
-    cblas_ssyrk64_(
+    cblas_ssyrk(
             CblasRowMajor,
             CblasUpper,
             CblasConjNoTrans,
