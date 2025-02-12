@@ -25,6 +25,11 @@ jobs:
             openmpi-bin libopenmpi-dev \
             libopenblas64-dev \
             libgtest-dev
+
+        ls /usr/lib/x86_64-linux-gnu/
+        ls /usr/lib/x86_64-linux-gnu/blas/
+
+        sudo update-alternatives --config libblas.so.3-x86_64-linux-gnu
         
         # GoogleTest requires a manual build and install
         cd /usr/src/gtest
