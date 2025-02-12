@@ -23,11 +23,8 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y cmake build-essential \
             openmpi-bin libopenmpi-dev \
-            libopenblas-dev \
+            libopenblas64-dev \
             libgtest-dev
-
-        # Set OpenBLAS as the default BLAS through the `update-alternatives` mechanism:
-        sudo update-alternatives --config libblas.so.3
         
         # GoogleTest requires a manual build and install
         cd /usr/src/gtest
