@@ -8,7 +8,7 @@ on:
 
 env:
   BUILD_TYPE: Release
-  MPI_PROCESSES: 4  # Adjust as needed for parallel execution
+  MPI_PROCESSES: 2  # Adjust as needed for parallel execution
 
 jobs:
   build:
