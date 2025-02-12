@@ -32,7 +32,7 @@ jobs:
         echo "Checking available packages..."
         pkg-config --list-all
         echo "Checking OpenBLAS package..."
-        pkg-config --modversion openblas
+        pkg-config --modversion openblas64
         echo "Checking OpenMPI package..."
         pkg-config --modversion mpi
 
@@ -40,9 +40,9 @@ jobs:
       run: |
         cmake -B ${{github.workspace}}/build \
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
-          -DCMAKE_C_FLAGS="$(pkg-config --cflags openblas mpi)" \
-          -DCMAKE_CXX_FLAGS="$(pkg-config --cflags openblas mpi)" \
-          -DCMAKE_EXE_LINKER_FLAGS="$(pkg-config --libs openblas mpi)"
+          -DCMAKE_C_FLAGS="$(pkg-config --cflags openblas64 mpi)" \
+          -DCMAKE_CXX_FLAGS="$(pkg-config --cflags openblas64 mpi)" \
+          -DCMAKE_EXE_LINKER_FLAGS="$(pkg-config --libs openblas64 mpi)"
 
     - name: Build
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
