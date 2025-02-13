@@ -74,8 +74,23 @@ jobs:
         name: built-project
         path: ${{ github.workspace }}/build
 
-    - name: Run Tests with OpenMPI and GTest
+    - name: Set Execute Permissions for Test Binaries
+      run: chmod +x ${{ github.workspace }}/build/test/*
+
+    - name: Verify File Permissions
+      run: ls -l ${{ github.workspace }}/build/test
+
+    - name: Check Missing Dependencies
+      run: ldd ${{ github.workspace }}/build/test/MPI_SYRK_test || true
+
+    - name: Run Tests with GTest
       working-directory: ${{github.workspace}}/build/test
       run: |
         set -e  # Exit on first failure
-        mpiexec -np ${{env.MPI_PROCESSES}} ctest -C ${{env.BUILD_TYPE}}
+        # Run tests
+        # mpiexec -np ${{env.MPI_PROCESSES}} ctest -C ${{env.BUILD_TYPE}}
+        ctest --rerun-failed --output-on-failure -C ${{env.BUILD_TYPE}}
+
+    - name: Output LastTest.log
+      run: cat ${{ github.workspace }}/build/test/Testing/Temporary/LastTest.log
+

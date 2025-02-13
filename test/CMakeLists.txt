@@ -24,6 +24,8 @@ FetchContent_GetProperties(googletest)
 # Method to fetch and set up GoogleTest
 FetchContent_MakeAvailable(googletest)
 
+add_definitions(-DOMPI_SKIP_MPICXX)
+
 # Create test executable
 add_executable(MPI_SYRK_test ${SOURCES})
 
