@@ -2,7 +2,6 @@
 set(BLA_VENDOR OpenBLAS)
 set(BLA_SIZEOF_INTEGER 8)
 set(BLA_PREFER_PKGCONFIG TRUE)
-set(BLA_PKGCONFIG_BLAS openblas64)
 
 if (HYDRA)
     set(ENV{PKG_CONFIG_PATH} "/home/thesis/jheld/MPI_Syrk_implementation")

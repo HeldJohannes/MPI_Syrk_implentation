@@ -63,8 +63,7 @@ void parseInput(run_config *s, int argc, char **argv, int rank) {
     if (optind < argc) {
         s->fileName = argv[optind];
     } else {
-        fprintf(stderr, "missing input file name\n");
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "missing input file name\n Generate random input\n");
     }
     log_trace("Exit parseInput");
 }

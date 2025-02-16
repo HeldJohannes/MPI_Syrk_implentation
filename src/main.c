@@ -9,6 +9,8 @@
 #include "one_d_syrk.h"
 #include "two_d_syrk.h"
 
+#define ROOT 0
+
 _Bool PRINT_RESULT = false;
 
 /**
@@ -72,7 +74,7 @@ int main(int argc, char *argv[]) {
 
     // read the input matrix A
     // and compute the index_array
-    if (rank == 0) {
+    if (rank == ROOT) {
 
         if (config.fileName != NULL) {
             read_input_file(rank, &config, input);
@@ -261,9 +263,11 @@ int main(int argc, char *argv[]) {
             improved_syrkIterative(&config, rank, index_arr_rank, rank_input, rank_input_t, rank_syrk_result);
             break;
         case 2:
+            // 1D SYRK - OpenBLAS
             syrk_withOpenBLAS(&config, rank, index_arr_rank, rank_input, rank_syrk_result);
             break;
         case 3:
+            // 2D SYRK - OpenBLAS
             two_d_syrk(&config, rank, rank_syrk_result, rank_input);
             break;
         default:
@@ -302,7 +306,7 @@ int main(int argc, char *argv[]) {
     //log_debug("[rank %d]: MPI_Reduce_scatter took %f sec", rank, runtime_mpi_reduce_scatter);
     log_debug("[rank %d]: MPI_Reduce took %f sec", rank, runtime_mpi_reduce_scatter);
 
-    if (rank == 0) {
+    if (rank == ROOT) {
         double runtime = MPI_Wtime() - start;
         printf("The process took %f seconds to run.\n", runtime);
 
